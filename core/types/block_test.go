@@ -105,7 +105,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	// Create ACL tx.
 	addr := common.HexToAddress("0x0000000000000000000000000000000000000001")
 	tx2 := NewTx(&AccessListTx{
-		ChainID:    big.NewInt(1),
+		ChainID:    big.NewInt(1213),
 		Nonce:      0,
 		To:         &to,
 		Gas:        123457,

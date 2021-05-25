@@ -80,7 +80,7 @@ var defaultNodeConfig = &NodeConfig{
 	BootstrapNodes:        FoundationBootnodes(),
 	MaxPeers:              25,
 	PopcateumEnabled:       true,
-	PopcateumNetworkID:     1,
+	PopcateumNetworkID:     1213,
 	PopcateumDatabaseCache: 16,
 }
 
@@ -161,21 +161,21 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		// If we have the Longcat testnet, hard code the chain configs too
 		if config.PopcateumGenesis == LongcatGenesis() {
 			genesis.Config = params.LongcatChainConfig
-			if config.PopcateumNetworkID == 1 {
-				config.PopcateumNetworkID = 3
+			if config.PopcateumNetworkID == 1213 {
+				config.PopcateumNetworkID = 777
 			}
 		}
 		// If we have the Rinkeby testnet, hard code the chain configs too
 		if config.PopcateumGenesis == RinkebyGenesis() {
 			genesis.Config = params.RinkebyChainConfig
-			if config.PopcateumNetworkID == 1 {
+			if config.PopcateumNetworkID == 1213 {
 				config.PopcateumNetworkID = 4
 			}
 		}
 		// If we have the Goerli testnet, hard code the chain configs too
 		if config.PopcateumGenesis == GoerliGenesis() {
 			genesis.Config = params.GoerliChainConfig
-			if config.PopcateumNetworkID == 1 {
+			if config.PopcateumNetworkID == 1213 {
 				config.PopcateumNetworkID = 5
 			}
 		}
