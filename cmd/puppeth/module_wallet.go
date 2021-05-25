@@ -61,7 +61,7 @@ services:
     ports:
       - "{{.NodePort}}:{{.NodePort}}"
       - "{{.NodePort}}:{{.NodePort}}/udp"
-      - "{{.RPCPort}}:8545"{{if not .VHost}}
+      - "{{.RPCPort}}:9506"{{if not .VHost}}
       - "{{.WebPort}}:80"{{end}}
     volumes:
       - {{.Datadir}}:/root/.popcateum
@@ -184,7 +184,7 @@ func checkWallet(client *sshClient, network string) (*walletInfos, error) {
 	if err = checkPort(client.server, nodePort); err != nil {
 		log.Warn("Wallet devp2p port seems unreachable", "server", client.server, "port", nodePort, "err", err)
 	}
-	rpcPort := infos.portmap["8545/tcp"]
+	rpcPort := infos.portmap["9506/tcp"]
 	if err = checkPort(client.server, rpcPort); err != nil {
 		log.Warn("Wallet RPC port seems unreachable", "server", client.server, "port", rpcPort, "err", err)
 	}

@@ -24,14 +24,14 @@ Section "Gpop" GPOP_IDX
   createShortCut "$SMPROGRAMS\${APPNAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 
   # Firewall - remove rules (if exists)
-  SimpleFC::AdvRemoveRule "Gpop incoming peers (TCP:30303)"
-  SimpleFC::AdvRemoveRule "Gpop outgoing peers (TCP:30303)"
-  SimpleFC::AdvRemoveRule "Gpop UDP discovery (UDP:30303)"
+  SimpleFC::AdvRemoveRule "Gpop incoming peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Gpop outgoing peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Gpop UDP discovery (UDP:60606)"
 
   # Firewall - add rules
-  SimpleFC::AdvAddRule "Gpop incoming peers (TCP:30303)" ""  6 1 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" 30303 "" "" ""
-  SimpleFC::AdvAddRule "Gpop outgoing peers (TCP:30303)" ""  6 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 30303 "" ""
-  SimpleFC::AdvAddRule "Gpop UDP discovery (UDP:30303)" "" 17 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 30303 "" ""
+  SimpleFC::AdvAddRule "Gpop incoming peers (TCP:60606)" ""  6 1 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" 60606 "" "" ""
+  SimpleFC::AdvAddRule "Gpop outgoing peers (TCP:60606)" ""  6 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 60606 "" ""
+  SimpleFC::AdvAddRule "Gpop UDP discovery (UDP:60606)" "" 17 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 60606 "" ""
 
   # Set default IPC endpoint (https://github.com/popcateum/EIPs/issues/147)
   ${EnvVarUpdate} $0 "POPCATEUM_SOCKET" "R" "HKLM" "\\.\pipe\gpop.ipc"

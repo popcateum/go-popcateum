@@ -17,9 +17,9 @@ Section "Uninstall"
   rmDir "$SMPROGRAMS\${APPNAME}"
 
   # Firewall - remove rules if exists
-  SimpleFC::AdvRemoveRule "Gpop incoming peers (TCP:30303)"
-  SimpleFC::AdvRemoveRule "Gpop outgoing peers (TCP:30303)"
-  SimpleFC::AdvRemoveRule "Gpop UDP discovery (UDP:30303)"
+  SimpleFC::AdvRemoveRule "Gpop incoming peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Gpop outgoing peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Gpop UDP discovery (UDP:60606)"
 
   # Remove IPC endpoint (https://github.com/popcateum/EIPs/issues/147)
   ${un.EnvVarUpdate} $0 "POPCATEUM_SOCKET" "R" "HKLM" "\\.\pipe\gpop.ipc"
