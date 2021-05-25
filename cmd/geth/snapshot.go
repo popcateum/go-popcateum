@@ -1,18 +1,18 @@
-// Copyright 2020 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2020 The go-popcateum Authors
+// This file is part of go-popcateum.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// go-popcateum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// go-popcateum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -21,16 +21,16 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/state/pruner"
-	"github.com/ethereum/go-ethereum/core/state/snapshot"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/popcateum/go-popcateum/cmd/utils"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core/rawdb"
+	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/state/pruner"
+	"github.com/popcateum/go-popcateum/core/state/snapshot"
+	"github.com/popcateum/go-popcateum/crypto"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/rlp"
+	"github.com/popcateum/go-popcateum/trie"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
@@ -51,21 +51,21 @@ var (
 		Subcommands: []cli.Command{
 			{
 				Name:      "prune-state",
-				Usage:     "Prune stale ethereum state data based on the snapshot",
+				Usage:     "Prune stale popcateum state data based on the snapshot",
 				ArgsUsage: "<root>",
 				Action:    utils.MigrateFlags(pruneState),
 				Category:  "MISCELLANEOUS COMMANDS",
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.AncientFlag,
-					utils.RopstenFlag,
+					utils.LongcatFlag,
 					utils.RinkebyFlag,
 					utils.GoerliFlag,
 					utils.CacheTrieJournalFlag,
 					utils.BloomFilterSizeFlag,
 				},
 				Description: `
-geth snapshot prune-state <state-root>
+gpop snapshot prune-state <state-root>
 will prune historical state data with the help of the state snapshot.
 All trie nodes and contract codes that do not belong to the specified
 version state will be deleted from the database. After pruning, only
@@ -75,7 +75,7 @@ The default pruning target is the HEAD-127 state.
 
 WARNING: It's necessary to delete the trie clean cache after the pruning.
 If you specify another directory for the trie clean cache via "--cache.trie.journal"
-during the use of Geth, please also specify it here for correct deletion. Otherwise
+during the use of Gpop, please also specify it here for correct deletion. Otherwise
 the trie clean cache with default directory will be deleted.
 `,
 			},
@@ -88,12 +88,12 @@ the trie clean cache with default directory will be deleted.
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.AncientFlag,
-					utils.RopstenFlag,
+					utils.LongcatFlag,
 					utils.RinkebyFlag,
 					utils.GoerliFlag,
 				},
 				Description: `
-geth snapshot verify-state <state-root>
+gpop snapshot verify-state <state-root>
 will traverse the whole accounts and storages set based on the specified
 snapshot and recalculate the root hash of state for verification.
 In other words, this command does the snapshot to trie conversion.
@@ -108,12 +108,12 @@ In other words, this command does the snapshot to trie conversion.
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.AncientFlag,
-					utils.RopstenFlag,
+					utils.LongcatFlag,
 					utils.RinkebyFlag,
 					utils.GoerliFlag,
 				},
 				Description: `
-geth snapshot traverse-state <state-root>
+gpop snapshot traverse-state <state-root>
 will traverse the whole state from the given state root and will abort if any
 referenced trie node or contract code is missing. This command can be used for
 state integrity verification. The default checking target is the HEAD state.
@@ -130,12 +130,12 @@ It's also usable without snapshot enabled.
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.AncientFlag,
-					utils.RopstenFlag,
+					utils.LongcatFlag,
 					utils.RinkebyFlag,
 					utils.GoerliFlag,
 				},
 				Description: `
-geth snapshot traverse-rawstate <state-root>
+gpop snapshot traverse-rawstate <state-root>
 will traverse the whole state from the given root and will abort if any referenced
 trie node or contract code is missing. This command can be used for state integrity
 verification. The default checking target is the HEAD state. It's basically identical

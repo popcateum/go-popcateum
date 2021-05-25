@@ -1,18 +1,18 @@
-// Copyright 2019 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2019 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 package forkid
 
@@ -21,9 +21,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/params"
+	"github.com/popcateum/go-popcateum/rlp"
 )
 
 // TestCreation tests that different genesis and fork rule combinations result in
@@ -65,10 +65,10 @@ func TestCreation(t *testing.T) {
 				{20000000, ID{Hash: checksumToBytes(0x0eb440f6), Next: 0}},        // Future Berlin block
 			},
 		},
-		// Ropsten test cases
+		// Longcat test cases
 		{
-			params.RopstenChainConfig,
-			params.RopstenGenesisHash,
+			params.LongcatChainConfig,
+			params.LongcatGenesisHash,
 			[]testcase{
 				{0, ID{Hash: checksumToBytes(0x30c7ddbc), Next: 10}},            // Unsynced, last Frontier, Homestead and first Tangerine block
 				{9, ID{Hash: checksumToBytes(0x30c7ddbc), Next: 10}},            // Last Tangerine block
@@ -196,7 +196,7 @@ func TestValidation(t *testing.T) {
 		// Local is mainnet Berlin, far in the future. Remote announces Gopherium (non existing fork)
 		// at some future block 88888888, for itself, but past block for local. Local is incompatible.
 		//
-		// This case detects non-upgraded nodes with majority hash power (typical Ropsten mess).
+		// This case detects non-upgraded nodes with majority hash power (typical Longcat mess).
 		{88888888, ID{Hash: checksumToBytes(0x0eb440f6), Next: 88888888}, ErrLocalIncompatibleOrStale},
 
 		// Local is mainnet Byzantium. Remote is also in Byzantium, but announces Gopherium (non existing

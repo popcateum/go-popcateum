@@ -1,18 +1,18 @@
-// Copyright 2020 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2020 The go-popcateum Authors
+// This file is part of go-popcateum.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// go-popcateum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// go-popcateum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -91,7 +91,7 @@ func TestMatching(t *testing.T) {
 		t.Fatal(err)
 	}
 	check := func(version string) {
-		vFull := fmt.Sprintf("Geth/%v-unstable-15339cf1-20201204/linux-amd64/go1.15.4", version)
+		vFull := fmt.Sprintf("Gpop/%v-unstable-15339cf1-20201204/linux-amd64/go1.15.4", version)
 		for _, vuln := range vulns {
 			r, err := regexp.Compile(vuln.Check)
 			vulnIntro := versionUint(vuln.Introduced)
@@ -101,7 +101,7 @@ func TestMatching(t *testing.T) {
 				t.Fatal(err)
 			}
 			if vuln.Name == "Denial of service due to Go CVE-2020-28362" {
-				// this one is not tied to geth-versions
+				// this one is not tied to gpop-versions
 				continue
 			}
 			if vulnIntro <= current && vulnFixed > current {

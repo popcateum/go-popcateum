@@ -1,18 +1,18 @@
-// Copyright 2017 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2017 The go-popcateum Authors
+// This file is part of go-popcateum.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// go-popcateum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// go-popcateum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -22,17 +22,17 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	math2 "github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/common/hexutil"
+	math2 "github.com/popcateum/go-popcateum/common/math"
+	"github.com/popcateum/go-popcateum/consensus/ethash"
+	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/types"
+	"github.com/popcateum/go-popcateum/params"
 )
 
 // alethGenesisSpec represents the genesis specification format used by the
-// C++ Ethereum implementation.
+// C++ Popcateum implementation.
 type alethGenesisSpec struct {
 	SealEngine string `json:"sealEngine"`
 	Params     struct {
@@ -93,10 +93,10 @@ type alethGenesisSpecLinearPricing struct {
 	Word uint64 `json:"word"`
 }
 
-// newAlethGenesisSpec converts a go-ethereum genesis block into a Aleth-specific
+// newAlethGenesisSpec converts a go-popcateum genesis block into a Aleth-specific
 // chain specification format.
 func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSpec, error) {
-	// Only ethash is currently supported between go-ethereum and aleth
+	// Only ethash is currently supported between go-popcateum and aleth
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}
@@ -275,10 +275,10 @@ type parityChainSpec struct {
 
 	Genesis struct {
 		Seal struct {
-			Ethereum struct {
+			Popcateum struct {
 				Nonce   types.BlockNonce `json:"nonce"`
 				MixHash hexutil.Bytes    `json:"mixHash"`
-			} `json:"ethereum"`
+			} `json:"popcateum"`
 		} `json:"seal"`
 
 		Difficulty *hexutil.Big   `json:"difficulty"`
@@ -314,7 +314,7 @@ type parityChainSpecPricing struct {
 	Linear *parityChainSpecLinearPricing `json:"linear,omitempty"`
 	ModExp *parityChainSpecModExpPricing `json:"modexp,omitempty"`
 
-	// Before the https://github.com/paritytech/parity-ethereum/pull/11039,
+	// Before the https://github.com/paritytech/parity-popcateum/pull/11039,
 	// Parity uses this format to config bn pairing price policy.
 	AltBnPairing *parityChainSepcAltBnPairingPricing `json:"alt_bn128_pairing,omitempty"`
 
@@ -361,10 +361,10 @@ type parityChainSpecVersionedPricing struct {
 	Info  string                           `json:"info,omitempty"`
 }
 
-// newParityChainSpec converts a go-ethereum genesis block into a Parity specific
+// newParityChainSpec converts a go-popcateum genesis block into a Parity specific
 // chain specification format.
 func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []string) (*parityChainSpec, error) {
-	// Only ethash is currently supported between go-ethereum and Parity
+	// Only ethash is currently supported between go-popcateum and Parity
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}
@@ -386,11 +386,11 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.HomesteadTransition = hexutil.Uint64(genesis.Config.HomesteadBlock.Uint64())
 
 	// Tangerine Whistle : 150
-	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-608.md
+	// https://github.com/popcateum/EIPs/blob/master/EIPS/eip-608.md
 	spec.Params.EIP150Transition = hexutil.Uint64(genesis.Config.EIP150Block.Uint64())
 
 	// Spurious Dragon: 155, 160, 161, 170
-	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-607.md
+	// https://github.com/popcateum/EIPs/blob/master/EIPS/eip-607.md
 	spec.Params.EIP155Transition = hexutil.Uint64(genesis.Config.EIP155Block.Uint64())
 	spec.Params.EIP160Transition = hexutil.Uint64(genesis.Config.EIP155Block.Uint64())
 	spec.Params.EIP161abcTransition = hexutil.Uint64(genesis.Config.EIP158Block.Uint64())
@@ -418,14 +418,14 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Params.NetworkID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.ChainID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.MaxCodeSize = params.MaxCodeSize
-	// geth has it set from zero
+	// gpop has it set from zero
 	spec.Params.MaxCodeSizeTransition = 0
 
 	// Disable this one
 	spec.Params.EIP98Transition = math.MaxInt64
 
-	spec.Genesis.Seal.Ethereum.Nonce = types.EncodeNonce(genesis.Nonce)
-	spec.Genesis.Seal.Ethereum.MixHash = genesis.Mixhash[:]
+	spec.Genesis.Seal.Popcateum.Nonce = types.EncodeNonce(genesis.Nonce)
+	spec.Genesis.Seal.Popcateum.MixHash = genesis.Mixhash[:]
 	spec.Genesis.Difficulty = (*hexutil.Big)(genesis.Difficulty)
 	spec.Genesis.Author = genesis.Coinbase
 	spec.Genesis.Timestamp = (hexutil.Uint64)(genesis.Timestamp)
@@ -590,9 +590,9 @@ func (spec *parityChainSpec) setIstanbul(num *big.Int) {
 	spec.Params.EIP1283ReenableTransition = hexutil.Uint64(num.Uint64())
 }
 
-// pyEthereumGenesisSpec represents the genesis specification format used by the
-// Python Ethereum implementation.
-type pyEthereumGenesisSpec struct {
+// pyPopcateumGenesisSpec represents the genesis specification format used by the
+// Python Popcateum implementation.
+type pyPopcateumGenesisSpec struct {
 	Nonce      types.BlockNonce  `json:"nonce"`
 	Timestamp  hexutil.Uint64    `json:"timestamp"`
 	ExtraData  hexutil.Bytes     `json:"extraData"`
@@ -604,14 +604,14 @@ type pyEthereumGenesisSpec struct {
 	ParentHash common.Hash       `json:"parentHash"`
 }
 
-// newPyEthereumGenesisSpec converts a go-ethereum genesis block into a Parity specific
+// newPyPopcateumGenesisSpec converts a go-popcateum genesis block into a Parity specific
 // chain specification format.
-func newPyEthereumGenesisSpec(network string, genesis *core.Genesis) (*pyEthereumGenesisSpec, error) {
-	// Only ethash is currently supported between go-ethereum and pyethereum
+func newPyPopcateumGenesisSpec(network string, genesis *core.Genesis) (*pyPopcateumGenesisSpec, error) {
+	// Only ethash is currently supported between go-popcateum and pypopcateum
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}
-	spec := &pyEthereumGenesisSpec{
+	spec := &pyPopcateumGenesisSpec{
 		Nonce:      types.EncodeNonce(genesis.Nonce),
 		Timestamp:  (hexutil.Uint64)(genesis.Timestamp),
 		ExtraData:  genesis.ExtraData,

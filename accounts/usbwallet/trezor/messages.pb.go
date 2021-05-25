@@ -96,17 +96,17 @@ const (
 	MessageType_MessageType_DebugLinkMemory      MessageType = 111
 	MessageType_MessageType_DebugLinkMemoryWrite MessageType = 112
 	MessageType_MessageType_DebugLinkFlashErase  MessageType = 113
-	// Ethereum
-	MessageType_MessageType_EthereumGetPublicKey     MessageType = 450
-	MessageType_MessageType_EthereumPublicKey        MessageType = 451
-	MessageType_MessageType_EthereumGetAddress       MessageType = 56
-	MessageType_MessageType_EthereumAddress          MessageType = 57
-	MessageType_MessageType_EthereumSignTx           MessageType = 58
-	MessageType_MessageType_EthereumTxRequest        MessageType = 59
-	MessageType_MessageType_EthereumTxAck            MessageType = 60
-	MessageType_MessageType_EthereumSignMessage      MessageType = 64
-	MessageType_MessageType_EthereumVerifyMessage    MessageType = 65
-	MessageType_MessageType_EthereumMessageSignature MessageType = 66
+	// Popcateum
+	MessageType_MessageType_PopcateumGetPublicKey     MessageType = 450
+	MessageType_MessageType_PopcateumPublicKey        MessageType = 451
+	MessageType_MessageType_PopcateumGetAddress       MessageType = 56
+	MessageType_MessageType_PopcateumAddress          MessageType = 57
+	MessageType_MessageType_PopcateumSignTx           MessageType = 58
+	MessageType_MessageType_PopcateumTxRequest        MessageType = 59
+	MessageType_MessageType_PopcateumTxAck            MessageType = 60
+	MessageType_MessageType_PopcateumSignMessage      MessageType = 64
+	MessageType_MessageType_PopcateumVerifyMessage    MessageType = 65
+	MessageType_MessageType_PopcateumMessageSignature MessageType = 66
 	// NEM
 	MessageType_MessageType_NEMGetAddress       MessageType = 67
 	MessageType_MessageType_NEMAddress          MessageType = 68
@@ -306,16 +306,16 @@ var MessageType_name = map[int32]string{
 	111: "MessageType_DebugLinkMemory",
 	112: "MessageType_DebugLinkMemoryWrite",
 	113: "MessageType_DebugLinkFlashErase",
-	450: "MessageType_EthereumGetPublicKey",
-	451: "MessageType_EthereumPublicKey",
-	56:  "MessageType_EthereumGetAddress",
-	57:  "MessageType_EthereumAddress",
-	58:  "MessageType_EthereumSignTx",
-	59:  "MessageType_EthereumTxRequest",
-	60:  "MessageType_EthereumTxAck",
-	64:  "MessageType_EthereumSignMessage",
-	65:  "MessageType_EthereumVerifyMessage",
-	66:  "MessageType_EthereumMessageSignature",
+	450: "MessageType_PopcateumGetPublicKey",
+	451: "MessageType_PopcateumPublicKey",
+	56:  "MessageType_PopcateumGetAddress",
+	57:  "MessageType_PopcateumAddress",
+	58:  "MessageType_PopcateumSignTx",
+	59:  "MessageType_PopcateumTxRequest",
+	60:  "MessageType_PopcateumTxAck",
+	64:  "MessageType_PopcateumSignMessage",
+	65:  "MessageType_PopcateumVerifyMessage",
+	66:  "MessageType_PopcateumMessageSignature",
 	67:  "MessageType_NEMGetAddress",
 	68:  "MessageType_NEMAddress",
 	69:  "MessageType_NEMSignTx",
@@ -502,16 +502,16 @@ var MessageType_value = map[string]int32{
 	"MessageType_DebugLinkMemory":                           111,
 	"MessageType_DebugLinkMemoryWrite":                      112,
 	"MessageType_DebugLinkFlashErase":                       113,
-	"MessageType_EthereumGetPublicKey":                      450,
-	"MessageType_EthereumPublicKey":                         451,
-	"MessageType_EthereumGetAddress":                        56,
-	"MessageType_EthereumAddress":                           57,
-	"MessageType_EthereumSignTx":                            58,
-	"MessageType_EthereumTxRequest":                         59,
-	"MessageType_EthereumTxAck":                             60,
-	"MessageType_EthereumSignMessage":                       64,
-	"MessageType_EthereumVerifyMessage":                     65,
-	"MessageType_EthereumMessageSignature":                  66,
+	"MessageType_PopcateumGetPublicKey":                      450,
+	"MessageType_PopcateumPublicKey":                         451,
+	"MessageType_PopcateumGetAddress":                        56,
+	"MessageType_PopcateumAddress":                           57,
+	"MessageType_PopcateumSignTx":                            58,
+	"MessageType_PopcateumTxRequest":                         59,
+	"MessageType_PopcateumTxAck":                             60,
+	"MessageType_PopcateumSignMessage":                       64,
+	"MessageType_PopcateumVerifyMessage":                     65,
+	"MessageType_PopcateumMessageSignature":                  66,
 	"MessageType_NEMGetAddress":                             67,
 	"MessageType_NEMAddress":                                68,
 	"MessageType_NEMSignTx":                                 69,

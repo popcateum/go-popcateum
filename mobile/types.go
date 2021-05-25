@@ -1,31 +1,31 @@
-// Copyright 2016 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2016 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Contains all the wrappers from the core/types package.
 
-package geth
+package gpop
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core/types"
+	"github.com/popcateum/go-popcateum/rlp"
 )
 
 type jsonEncoder interface {
@@ -83,7 +83,7 @@ func (b *Bloom) String() string {
 	return b.GetHex()
 }
 
-// Header represents a block header in the Ethereum blockchain.
+// Header represents a block header in the Popcateum blockchain.
 type Header struct {
 	header *types.Header
 }
@@ -159,7 +159,7 @@ func (h *Headers) Get(index int) (header *Header, _ error) {
 	return &Header{h.headers[index]}, nil
 }
 
-// Block represents an entire block in the Ethereum blockchain.
+// Block represents an entire block in the Popcateum blockchain.
 type Block struct {
 	block *types.Block
 }
@@ -225,7 +225,7 @@ func (b *Block) GetTransaction(hash *Hash) *Transaction {
 	return &Transaction{b.block.Transaction(hash.hash)}
 }
 
-// Transaction represents a single Ethereum transaction.
+// Transaction represents a single Popcateum transaction.
 type Transaction struct {
 	tx *types.Transaction
 }
@@ -295,7 +295,7 @@ func (tx *Transaction) GetCost() *BigInt { return &BigInt{tx.tx.Cost()} }
 // Deprecated: GetSigHash cannot know which signer to use.
 func (tx *Transaction) GetSigHash() *Hash { return &Hash{types.HomesteadSigner{}.Hash(tx.tx)} }
 
-// Deprecated: use EthereumClient.TransactionSender
+// Deprecated: use PopcateumClient.TransactionSender
 func (tx *Transaction) GetFrom(chainID *BigInt) (address *Address, _ error) {
 	var signer types.Signer = types.HomesteadSigner{}
 	if chainID != nil {

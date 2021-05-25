@@ -1,18 +1,18 @@
-// Copyright 2017 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2017 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 // This file contains the implementation for interacting with the Trezor hardware
 // wallets. The wire protocol spec can be found on the SatoshiLabs website:
@@ -22,7 +22,7 @@
 //
 // Before you touch the protocol files, you need to be aware of a breaking change
 // that occurred between firmware versions 1.7.3->1.8.0 (Model One) and 2.0.10->
-// 2.1.0 (Model T). The Ethereum address representation was changed from the 20
+// 2.1.0 (Model T). The Popcateum address representation was changed from the 20
 // byte binary blob to a 42 byte hex string. The upstream protocol buffer files
 // only support the new format, so blindly pulling in a new spec will break old
 // devices!
@@ -42,7 +42,7 @@
 //   - Grab the latest Go plugin `go get -u github.com/golang/protobuf/protoc-gen-go`
 //   - Vendor in the latest Go plugin `govendor fetch github.com/golang/protobuf/...`
 
-//go:generate protoc -I/usr/local/include:. --go_out=import_path=trezor:. messages.proto messages-common.proto messages-management.proto messages-ethereum.proto
+//go:generate protoc -I/usr/local/include:. --go_out=import_path=trezor:. messages.proto messages-common.proto messages-management.proto messages-popcateum.proto
 
 // Package trezor contains the wire protocol.
 package trezor

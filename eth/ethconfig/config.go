@@ -1,18 +1,18 @@
-// Copyright 2017 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2017 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package ethconfig contains the configuration of the ETH and LES protocols.
 package ethconfig
@@ -25,18 +25,18 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/eth/gasprice"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/miner"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/consensus"
+	"github.com/popcateum/go-popcateum/consensus/clique"
+	"github.com/popcateum/go-popcateum/consensus/ethash"
+	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/eth/downloader"
+	"github.com/popcateum/go-popcateum/eth/gasprice"
+	"github.com/popcateum/go-popcateum/ethdb"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/miner"
+	"github.com/popcateum/go-popcateum/node"
+	"github.com/popcateum/go-popcateum/params"
 )
 
 // FullNodeGPO contains default gasprice oracle settings for full node.
@@ -53,7 +53,7 @@ var LightClientGPO = gasprice.Config{
 	MaxPrice:   gasprice.DefaultMaxPrice,
 }
 
-// Defaults contains default settings for use on the Ethereum main net.
+// Defaults contains default settings for use on the Popcateum main net.
 var Defaults = Config{
 	SyncMode: downloader.FastSync,
 	Ethash: ethash.Config{
@@ -85,7 +85,7 @@ var Defaults = Config{
 	TxPool:      core.DefaultTxPoolConfig,
 	RPCGasCap:   25000000,
 	GPO:         FullNodeGPO,
-	RPCTxFeeCap: 1, // 1 ether
+	RPCTxFeeCap: 1, // 1 popcat
 }
 
 func init() {
@@ -114,7 +114,7 @@ func init() {
 // Config contains configuration options for of the ETH and LES protocols.
 type Config struct {
 	// The genesis block, which is inserted if the database is empty.
-	// If nil, the Ethereum main net block is used.
+	// If nil, the Popcateum main net block is used.
 	Genesis *core.Genesis `toml:",omitempty"`
 
 	// Protocol options
@@ -190,7 +190,7 @@ type Config struct {
 	RPCGasCap uint64
 
 	// RPCTxFeeCap is the global transaction fee(price * gaslimit) cap for
-	// send-transction variants. The unit is ether.
+	// send-transction variants. The unit is popcat.
 	RPCTxFeeCap float64
 
 	// Checkpoint is a hardcoded checkpoint which can be nil.

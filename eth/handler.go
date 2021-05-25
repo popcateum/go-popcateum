@@ -1,18 +1,18 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2015 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -24,20 +24,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/forkid"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/eth/fetcher"
-	"github.com/ethereum/go-ethereum/eth/protocols/eth"
-	"github.com/ethereum/go-ethereum/eth/protocols/snap"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/forkid"
+	"github.com/popcateum/go-popcateum/core/types"
+	"github.com/popcateum/go-popcateum/eth/downloader"
+	"github.com/popcateum/go-popcateum/eth/fetcher"
+	"github.com/popcateum/go-popcateum/eth/protocols/eth"
+	"github.com/popcateum/go-popcateum/eth/protocols/snap"
+	"github.com/popcateum/go-popcateum/ethdb"
+	"github.com/popcateum/go-popcateum/event"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/p2p"
+	"github.com/popcateum/go-popcateum/params"
+	"github.com/popcateum/go-popcateum/trie"
 )
 
 const (
@@ -51,7 +51,7 @@ var (
 )
 
 // txPool defines the methods needed from a transaction pool implementation to
-// support all the operations needed by the Ethereum chain protocols.
+// support all the operations needed by the Popcateum chain protocols.
 type txPool interface {
 	// Has returns an indicator whether txpool has a transaction
 	// cached with the given hash.
@@ -125,7 +125,7 @@ type handler struct {
 	peerWG    sync.WaitGroup
 }
 
-// newHandler returns a handler for all Ethereum chain management protocol.
+// newHandler returns a handler for all Popcateum chain management protocol.
 func newHandler(config *handlerConfig) (*handler, error) {
 	// Create the protocol manager with the base fields
 	if config.EventMux == nil {
@@ -250,7 +250,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	h.peerWG.Add(1)
 	defer h.peerWG.Done()
 
-	// Execute the Ethereum handshake
+	// Execute the Popcateum handshake
 	var (
 		genesis = h.chain.Genesis()
 		head    = h.chain.CurrentHeader()
@@ -260,7 +260,7 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	)
 	forkID := forkid.NewID(h.chain.Config(), h.chain.Genesis().Hash(), h.chain.CurrentHeader().Number.Uint64())
 	if err := peer.Handshake(h.networkID, td, hash, genesis.Hash(), forkID, h.forkFilter); err != nil {
-		peer.Log().Debug("Ethereum handshake failed", "err", err)
+		peer.Log().Debug("Popcateum handshake failed", "err", err)
 		return err
 	}
 	reject := false // reserved peer slots
@@ -280,11 +280,11 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 			return p2p.DiscTooManyPeers
 		}
 	}
-	peer.Log().Debug("Ethereum peer connected", "name", peer.Name())
+	peer.Log().Debug("Popcateum peer connected", "name", peer.Name())
 
 	// Register the peer locally
 	if err := h.peers.registerPeer(peer, snap); err != nil {
-		peer.Log().Error("Ethereum peer registration failed", "err", err)
+		peer.Log().Error("Popcateum peer registration failed", "err", err)
 		return err
 	}
 	defer h.removePeer(peer.ID())
@@ -368,11 +368,11 @@ func (h *handler) removePeer(id string) {
 	// Abort if the peer does not exist
 	peer := h.peers.peer(id)
 	if peer == nil {
-		logger.Error("Ethereum peer removal failed", "err", errPeerNotRegistered)
+		logger.Error("Popcateum peer removal failed", "err", errPeerNotRegistered)
 		return
 	}
 	// Remove the `eth` peer if it exists
-	logger.Debug("Removing Ethereum peer", "snap", peer.snapExt != nil)
+	logger.Debug("Removing Popcateum peer", "snap", peer.snapExt != nil)
 
 	// Remove the `snap` extension if it exists
 	if peer.snapExt != nil {
@@ -382,7 +382,7 @@ func (h *handler) removePeer(id string) {
 	h.txFetcher.Drop(id)
 
 	if err := h.peers.unregisterPeer(id); err != nil {
-		logger.Error("Ethereum peer removal failed", "err", err)
+		logger.Error("Popcateum peer removal failed", "err", err)
 	}
 	// Hard disconnect at the networking layer
 	peer.Peer.Disconnect(p2p.DiscUselessPeer)
@@ -424,7 +424,7 @@ func (h *handler) Stop() {
 	h.peers.close()
 	h.peerWG.Wait()
 
-	log.Info("Ethereum protocol stopped")
+	log.Info("Popcateum protocol stopped")
 }
 
 // BroadcastBlock will either propagate a block to a subset of its peers, or

@@ -1,18 +1,18 @@
-// Copyright 2017 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2017 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package ethash implements the ethash proof-of-work consensus engine.
 package ethash
@@ -34,10 +34,10 @@ import (
 	"unsafe"
 
 	"github.com/edsrzf/mmap-go"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/popcateum/go-popcateum/consensus"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/metrics"
+	"github.com/popcateum/go-popcateum/rpc"
 	"github.com/hashicorp/golang-lru/simplelru"
 )
 
@@ -490,7 +490,7 @@ func NewTester(notify []string, noverify bool) *Ethash {
 }
 
 // NewFaker creates a ethash consensus engine with a fake PoW scheme that accepts
-// all blocks' seal as valid, though they still have to conform to the Ethereum
+// all blocks' seal as valid, though they still have to conform to the Popcateum
 // consensus rules.
 func NewFaker() *Ethash {
 	return &Ethash{
@@ -503,7 +503,7 @@ func NewFaker() *Ethash {
 
 // NewFakeFailer creates a ethash consensus engine with a fake PoW scheme that
 // accepts all blocks as valid apart from the single one specified, though they
-// still have to conform to the Ethereum consensus rules.
+// still have to conform to the Popcateum consensus rules.
 func NewFakeFailer(fail uint64) *Ethash {
 	return &Ethash{
 		config: Config{
@@ -516,7 +516,7 @@ func NewFakeFailer(fail uint64) *Ethash {
 
 // NewFakeDelayer creates a ethash consensus engine with a fake PoW scheme that
 // accepts all blocks as valid, but delays verifications by some time, though
-// they still have to conform to the Ethereum consensus rules.
+// they still have to conform to the Popcateum consensus rules.
 func NewFakeDelayer(delay time.Duration) *Ethash {
 	return &Ethash{
 		config: Config{

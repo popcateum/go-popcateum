@@ -1,18 +1,18 @@
-// Copyright 2019 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2019 The go-popcateum Authors
+// This file is part of go-popcateum.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// go-popcateum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// go-popcateum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
 
 // checkpoint-admin is a utility that can be used to query checkpoint information
 // and register stable checkpoints into an oracle contract.
@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ethereum/go-ethereum/common/fdlimit"
-	"github.com/ethereum/go-ethereum/internal/flags"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/popcateum/go-popcateum/common/fdlimit"
+	"github.com/popcateum/go-popcateum/internal/flags"
+	"github.com/popcateum/go-popcateum/log"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -37,7 +37,7 @@ var (
 var app *cli.App
 
 func init() {
-	app = flags.NewApp(gitCommit, gitDate, "ethereum checkpoint helper tool")
+	app = flags.NewApp(gitCommit, gitDate, "popcateum checkpoint helper tool")
 	app.Commands = []cli.Command{
 		commandStatus,
 		commandDeploy,
@@ -72,7 +72,7 @@ var (
 	nodeURLFlag = cli.StringFlag{
 		Name:  "rpc",
 		Value: "http://localhost:8545",
-		Usage: "The rpc endpoint of a local or remote geth node",
+		Usage: "The rpc endpoint of a local or remote gpop node",
 	}
 	clefURLFlag = cli.StringFlag{
 		Name:  "clef",

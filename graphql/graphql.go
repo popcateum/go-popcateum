@@ -1,20 +1,20 @@
-// Copyright 2019 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2019 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package graphql provides a GraphQL interface to Ethereum node data.
+// Package graphql provides a GraphQL interface to Popcateum node data.
 package graphql
 
 import (
@@ -24,16 +24,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth/filters"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/popcateum/go-popcateum"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/common/hexutil"
+	"github.com/popcateum/go-popcateum/core/rawdb"
+	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/types"
+	"github.com/popcateum/go-popcateum/core/vm"
+	"github.com/popcateum/go-popcateum/eth/filters"
+	"github.com/popcateum/go-popcateum/internal/ethapi"
+	"github.com/popcateum/go-popcateum/rpc"
 )
 
 var (
@@ -71,7 +71,7 @@ func (b *Long) UnmarshalGraphQL(input interface{}) error {
 	return err
 }
 
-// Account represents an Ethereum account at a particular block.
+// Account represents an Popcateum account at a particular block.
 type Account struct {
 	backend       ethapi.Backend
 	address       common.Address
@@ -165,7 +165,7 @@ func (at *AccessTuple) StorageKeys(ctx context.Context) *[]common.Hash {
 	return at.storageKeys
 }
 
-// Transaction represents an Ethereum transaction.
+// Transaction represents an Popcateum transaction.
 // backend and hash are mandatory; all others will be fetched when required.
 type Transaction struct {
 	backend ethapi.Backend
@@ -410,7 +410,7 @@ func (t *Transaction) V(ctx context.Context) (hexutil.Big, error) {
 
 type BlockType int
 
-// Block represents an Ethereum block.
+// Block represents an Popcateum block.
 // backend, and numberOrHash are mandatory. All other fields are lazily fetched
 // when required.
 type Block struct {
@@ -834,8 +834,8 @@ func (b *Block) Account(ctx context.Context, args struct {
 // CallData encapsulates arguments to `call` or `estimateGas`.
 // All arguments are optional.
 type CallData struct {
-	From     *common.Address // The Ethereum address the call is from.
-	To       *common.Address // The Ethereum address the call is to.
+	From     *common.Address // The Popcateum address the call is from.
+	To       *common.Address // The Popcateum address the call is to.
 	Gas      *hexutil.Uint64 // The amount of gas provided for the call.
 	GasPrice *hexutil.Big    // The price of each unit of gas, in wei.
 	Value    *hexutil.Big    // The value sent along with the call.
@@ -1117,7 +1117,7 @@ func (r *Resolver) ChainID(ctx context.Context) (hexutil.Big, error) {
 
 // SyncState represents the synchronisation status returned from the `syncing` accessor.
 type SyncState struct {
-	progress ethereum.SyncProgress
+	progress popcateum.SyncProgress
 }
 
 func (s *SyncState) StartingBlock() hexutil.Uint64 {

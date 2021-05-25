@@ -14,7 +14,7 @@ Example:
   "messages": [
     {
       "name": "message",
-      "value": "\u0019Ethereum Signed Message:\n11hello world",
+      "value": "\u0019Popcateum Signed Message:\n11hello world",
       "type": "text/plain"
     }
   ],

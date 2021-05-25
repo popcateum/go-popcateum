@@ -1,18 +1,18 @@
-// Copyright 2020 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2020 The go-popcateum Authors
+// This file is part of the go-popcateum library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The go-popcateum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The go-popcateum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package catalyst implements the temporary eth1/eth2 RPC integration.
 package catalyst
@@ -23,20 +23,20 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/node"
-	chainParams "github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/types"
+	"github.com/popcateum/go-popcateum/eth"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/node"
+	chainParams "github.com/popcateum/go-popcateum/params"
+	"github.com/popcateum/go-popcateum/rpc"
+	"github.com/popcateum/go-popcateum/trie"
 )
 
 // Register adds catalyst APIs to the node.
-func Register(stack *node.Node, backend *eth.Ethereum) error {
+func Register(stack *node.Node, backend *eth.Popcateum) error {
 	chainconfig := backend.BlockChain().Config()
 	if chainconfig.CatalystBlock == nil {
 		return errors.New("catalystBlock is not set in genesis config")
@@ -57,10 +57,10 @@ func Register(stack *node.Node, backend *eth.Ethereum) error {
 }
 
 type consensusAPI struct {
-	eth *eth.Ethereum
+	eth *eth.Popcateum
 }
 
-func newConsensusAPI(eth *eth.Ethereum) *consensusAPI {
+func newConsensusAPI(eth *eth.Popcateum) *consensusAPI {
 	return &consensusAPI{eth: eth}
 }
 
@@ -130,7 +130,7 @@ func (api *consensusAPI) AssembleBlock(params assembleBlockParams) (*executableD
 		return nil, err
 	}
 
-	coinbase, err := api.eth.Etherbase()
+	coinbase, err := api.eth.Popcatbase()
 	if err != nil {
 		return nil, err
 	}

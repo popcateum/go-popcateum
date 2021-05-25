@@ -5,7 +5,7 @@ protocol development purposes. It can do many things.
 
 ### ENR Decoding
 
-Use `devp2p enrdump <base64>` to verify and display an Ethereum Node Record.
+Use `devp2p enrdump <base64>` to verify and display an Popcateum Node Record.
 
 ### Node Key Management
 
@@ -44,7 +44,7 @@ set to standard output. The following filters are supported:
 - `-limit <N>` limits the output set to N entries, taking the top N nodes by score
 - `-ip <CIDR>` filters nodes by IP subnet
 - `-min-age <duration>` filters nodes by 'first seen' time
-- `-eth-network <mainnet/rinkeby/goerli/ropsten>` filters nodes by "eth" ENR entry
+- `-eth-network <mainnet/rinkeby/goerli/longcat>` filters nodes by "eth" ENR entry
 - `-les-server` filters nodes by LES server support
 - `-snap` filters nodes by snap protocol support
 
@@ -110,14 +110,14 @@ The Eth Protocol test suite is a conformance test suite for the [eth protocol][e
 
 To run the eth protocol test suite against your implementation, the node needs to be initialized as such:
 
-1. initialize the geth node with the `genesis.json` file contained in the `testdata` directory
+1. initialize the gpop node with the `genesis.json` file contained in the `testdata` directory
 2. import the `halfchain.rlp` file in the `testdata` directory
-3. run geth with the following flags:
+3. run gpop with the following flags:
 ```
-geth --datadir <datadir> --nodiscover --nat=none --networkid 19763 --verbosity 5
+gpop --datadir <datadir> --nodiscover --nat=none --networkid 19763 --verbosity 5
 ```
 
-Then, run the following command, replacing `<enode>` with the enode of the geth node:
+Then, run the following command, replacing `<enode>` with the enode of the gpop node:
  ```
  devp2p rlpx eth-test <enode> cmd/devp2p/internal/ethtest/testdata/chain.rlp cmd/devp2p/internal/ethtest/testdata/genesis.json
 ```
@@ -127,14 +127,14 @@ Repeat the above process (re-initialising the node) in order to run the Eth Prot
 #### Eth66 Test Suite
 
 The Eth66 test suite is also a conformance test suite for the eth 66 protocol version specifically.
-To run the eth66 protocol test suite, initialize a geth node as described above and run the following command,
-replacing `<enode>` with the enode of the geth node:
+To run the eth66 protocol test suite, initialize a gpop node as described above and run the following command,
+replacing `<enode>` with the enode of the gpop node:
 
  ```
  devp2p rlpx eth66-test <enode> cmd/devp2p/internal/ethtest/testdata/chain.rlp cmd/devp2p/internal/ethtest/testdata/genesis.json
 ```
 
-[eth]: https://github.com/ethereum/devp2p/blob/master/caps/eth.md
-[dns-tutorial]: https://geth.ethereum.org/docs/developers/dns-discovery-setup
-[discv4]: https://github.com/ethereum/devp2p/tree/master/discv4.md
-[discv5]: https://github.com/ethereum/devp2p/tree/master/discv5/discv5.md
+[eth]: https://github.com/popcateum/devp2p/blob/master/caps/eth.md
+[dns-tutorial]: https://gpop.popcateum.org/docs/developers/dns-discovery-setup
+[discv4]: https://github.com/popcateum/devp2p/tree/master/discv4.md
+[discv5]: https://github.com/popcateum/devp2p/tree/master/discv5/discv5.md
