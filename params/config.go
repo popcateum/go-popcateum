@@ -27,7 +27,7 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xbd1f479aed66db4aedc1c35a31b3dd04e56ba61b02e31928e32169e0ee5fad59")
+	MainnetGenesisHash = common.HexToHash("0x07fd751edea3b3a2d790002e4712b14e2d0e43670f25952d4734ee31b526fa1b")
 	LongcatGenesisHash = common.HexToHash("0x89a46123af547787af58b3a756534c60167cee585efb8ac775ca48d42a92b5d1")
 	RinkebyGenesisHash = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
 	GoerliGenesisHash  = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
