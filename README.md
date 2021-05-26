@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo/popcateum.png" width="200" alt="popcateum" />
+  <img src="assets/logo/popcateum.png" width="350" alt="popcateum" />
 </p>
 
 ## Go Popcateum
