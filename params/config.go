@@ -27,7 +27,7 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xbd1f479aed66db4aedc1c35a31b3dd04e56ba61b02e31928e32169e0ee5fad59")
+	MainnetGenesisHash = common.HexToHash("0x07fd751edea3b3a2d790002e4712b14e2d0e43670f25952d4734ee31b526fa1b")
 	LongcatGenesisHash = common.HexToHash("0x89a46123af547787af58b3a756534c60167cee585efb8ac775ca48d42a92b5d1")
 	RinkebyGenesisHash = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
 	GoerliGenesisHash  = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
@@ -56,18 +56,18 @@ var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(1213),
-		HomesteadBlock:      big.NewInt(1),
+		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
-		EIP150Block:         big.NewInt(2),
-		EIP155Block:         big.NewInt(3),
-		EIP158Block:         big.NewInt(4),
-		ByzantiumBlock:      big.NewInt(5),
-		ConstantinopleBlock: big.NewInt(6),
-		PetersburgBlock:     big.NewInt(7),
-		IstanbulBlock:       big.NewInt(8),
-		MuirGlacierBlock:    big.NewInt(9),
-		BerlinBlock:         big.NewInt(10),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
 		Ethash:              new(EthashConfig),
 	}
 
