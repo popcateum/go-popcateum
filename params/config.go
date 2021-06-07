@@ -68,6 +68,9 @@ var (
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
+		PopSongBlock:        big.NewInt(100_000),
+		PopcornBlock:        big.NewInt(4_000_000),
+		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
 	}
 
@@ -107,6 +110,9 @@ var (
 		IstanbulBlock:       big.NewInt(10),
 		MuirGlacierBlock:    big.NewInt(10),
 		BerlinBlock:         big.NewInt(10),
+		PopSongBlock:        big.NewInt(100_000),
+		PopcornBlock:        big.NewInt(4_000_000),
+		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
 	}
 
@@ -146,6 +152,9 @@ var (
 		IstanbulBlock:       big.NewInt(5_435_345),
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         big.NewInt(8_290_928),
+		PopSongBlock:        nil,
+		PopcornBlock:        nil,
+		SeaPopBlock:         nil,
 		Clique: &CliqueConfig{
 			Period: 15,
 			Epoch:  30000,
@@ -177,6 +186,9 @@ var (
 		IstanbulBlock:       big.NewInt(1_561_651),
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         big.NewInt(4_460_644),
+		PopSongBlock:        nil,
+		PopcornBlock:        nil,
+		SeaPopBlock:         nil,
 		Clique: &CliqueConfig{
 			Period: 15,
 			Epoch:  30000,
@@ -208,6 +220,9 @@ var (
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         nil, // Don't enable Berlin directly, we're YOLOing it
+		PopSongBlock:        nil
+		PopcornBlock:        nil
+		SeaPopBlock:         nil
 		YoloV3Block:         big.NewInt(0),
 		Clique: &CliqueConfig{
 			Period: 15,
@@ -220,16 +235,16 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Popcateum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -307,6 +322,10 @@ type ChainConfig struct {
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
 
+	PopSongBlock         *big.Int `json:"berlinBlock,omitempty"`         // PopSong switch block (nil = no fork, 0 = already on popsong)
+	PopcornBlock         *big.Int `json:"berlinBlock,omitempty"`         // Popcorn switch block (nil = no fork, 0 = already on popcorn)
+	SeaPopBlock         *big.Int `json:"berlinBlock,omitempty"`         // SeaPop switch block (nil = no fork, 0 = already on seapop)
+
 	YoloV3Block   *big.Int `json:"yoloV3Block,omitempty"`   // YOLO v3: Gas repricings TODO @holiman add EIP references
 	EWASMBlock    *big.Int `json:"ewasmBlock,omitempty"`    // EWASM switch block (nil = no fork, 0 = already activated)
 	CatalystBlock *big.Int `json:"catalystBlock,omitempty"` // Catalyst switch block (nil = no fork, 0 = already on catalyst)
@@ -346,7 +365,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, YOLO v3: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, Pop Song: %v, Popcorn: %v, Sea Pop: %v, YOLO v3: %v, Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -360,6 +379,9 @@ func (c *ChainConfig) String() string {
 		c.IstanbulBlock,
 		c.MuirGlacierBlock,
 		c.BerlinBlock,
+		c.PopSongBlock,
+		c.PopcornBlock,
+		c.SeaPopBlock,
 		c.YoloV3Block,
 		engine,
 	)
@@ -422,6 +444,21 @@ func (c *ChainConfig) IsBerlin(num *big.Int) bool {
 	return isForked(c.BerlinBlock, num) || isForked(c.YoloV3Block, num)
 }
 
+// IsPopSong returns whether num is either equal to the PopSong fork block or greater.
+func (c *ChainConfig) IsPopSong(num *big.Int) bool {
+	return isForked(c.PopSongBlock, num)
+}
+
+// IsPopcorn returns whether num is either equal to the Popcorn fork block or greater.
+func (c *ChainConfig) IsPopcorn(num *big.Int) bool {
+	return isForked(c.PopcornBlock, num)
+}
+
+// IsSeaPop returns whether num is either equal to the SeaPop fork block or greater.
+func (c *ChainConfig) IsSeaPop(num *big.Int) bool {
+	return isForked(c.SeaPopBlock, num)
+}
+
 // IsCatalyst returns whether num is either equal to the Merge fork block or greater.
 func (c *ChainConfig) IsCatalyst(num *big.Int) bool {
 	return isForked(c.CatalystBlock, num)
@@ -471,6 +508,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
 		{name: "berlinBlock", block: c.BerlinBlock},
+		{name: "popsongBlock", block: c.PopSongBlock},
+		{name: "popcornBlock", block: c.PopcornBlock},
+		{name: "seapopBlock", block: c.SeaPopBlock},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -536,6 +576,15 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	}
 	if isForkIncompatible(c.BerlinBlock, newcfg.BerlinBlock, head) {
 		return newCompatError("Berlin fork block", c.BerlinBlock, newcfg.BerlinBlock)
+	}
+	if isForkIncompatible(c.PopSongBlock, newcfg.PopSongBlock, head) {
+		return newCompatError("PopSong fork block", c.PopSongBlock, newcfg.PopSongBlock)
+	}
+	if isForkIncompatible(c.PopcornBlock, newcfg.PopcornBlock, head) {
+		return newCompatError("Popcorn fork block", c.PopcornBlock, newcfg.PopcornBlock)
+	}
+	if isForkIncompatible(c.SeaPopBlock, newcfg.SeaPopBlock, head) {
+		return newCompatError("SeaPop fork block", c.SeaPopBlock, newcfg.SeaPopBlock)
 	}
 	if isForkIncompatible(c.YoloV3Block, newcfg.YoloV3Block, head) {
 		return newCompatError("YOLOv3 fork block", c.YoloV3Block, newcfg.YoloV3Block)
@@ -610,7 +659,8 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsCatalyst                                    bool
+	IsBerlin, IsPopSong, IsPopcorn, IsSeaPop                bool
+	IsCatalyst                                    					bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -630,6 +680,9 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
+		IsPopSong:        c.IsBerlin(num),
+		IsPopcorn:        c.IsBerlin(num),
+		IsSeaPop:         c.IsBerlin(num),
 		IsCatalyst:       c.IsCatalyst(num),
 	}
 }
