@@ -68,7 +68,7 @@ var (
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
-		PopSongBlock:        big.NewInt(80_000),
+		PopSongBlock:        big.NewInt(85_000),
 		PopcornBlock:        big.NewInt(4_000_000),
 		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
