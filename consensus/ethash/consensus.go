@@ -39,14 +39,25 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	RewardString									= "50000000000000000000" //5e+19
-	DefaultBlockReward, _					= big.NewInt(0).SetString(RewardString, 10)
+	DefaultRewardValue						= "50000000000000000000" //5e+19
+	DefaultRewardBigInt, _				= big.NewInt(0).SetString(DefaultRewardValue, 10)
+	PopcornRewardValue						= "30000000000000000000" //3e+19
+	PopcornRewardBigInt, _				= big.NewInt(0).SetString(PopcornRewardValue, 10)
+	SeaPopRewardValue							= "10000000000000000000" //1e+19
+	SeaPopRewardBigInt, _					= big.NewInt(0).SetString(SeaPopRewardValue, 10)
 
-	FrontierBlockReward           = DefaultBlockReward // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward          = DefaultBlockReward // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward     = DefaultBlockReward // Block reward in wei for successfully mining a block upward from Constantinople
+	FrontierBlockReward           = DefaultRewardBigInt // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward          = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward     = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Constantinople
+	PopcornBlockReward          	= PopcornRewardBigInt // Block reward in wei for successfully mining a block upward from Popcorn
+	SeaPopBlockReward     				= SeaPopRewardBigInt // Block reward in wei for successfully mining a block upward from SeaPop
 	maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
 	allowedFutureBlockTimeSeconds = int64(15)         // Max seconds from current time allowed for blocks, before they're considered future blocks
+
+	// PopSong hard fork update.
+	// Decrease average block time to 6 ~ 11s.
+	// It offsets the bomb 3M blocks from Eip2384, so in total 12M blocks.
+	calcDifficultyPopSong = makePopcateumDifficultyCalculator(big.NewInt(12000000))
 
 	// calcDifficultyEip2384 is the difficulty adjustment algorithm as specified by EIP 2384.
 	// It offsets the bomb 4M blocks from Constantinople, so in total 9M blocks.
