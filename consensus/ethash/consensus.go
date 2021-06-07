@@ -719,6 +719,12 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	if config.IsConstantinople(header.Number) {
 		blockReward = ConstantinopleBlockReward
 	}
+	if config.IsPopcorn(header.Number) {
+		blockReward = PopcornBlockReward
+	}
+	if config.IsSeaPop(header.Number) {
+		blockReward = SeaPopBlockReward
+	}
 	// Accumulate the rewards for the miner and any included uncles
 	reward := new(big.Int).Set(blockReward)
 	r := new(big.Int)
