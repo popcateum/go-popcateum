@@ -220,9 +220,9 @@ var (
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         nil, // Don't enable Berlin directly, we're YOLOing it
-		PopSongBlock:        nil
-		PopcornBlock:        nil
-		SeaPopBlock:         nil
+		PopSongBlock:        nil,
+		PopcornBlock:        nil,
+		SeaPopBlock:         nil,
 		YoloV3Block:         big.NewInt(0),
 		Clique: &CliqueConfig{
 			Period: 15,
