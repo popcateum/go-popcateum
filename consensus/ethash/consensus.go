@@ -39,14 +39,25 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	RewardString									= "50000000000000000000" //5e+19
-	DefaultBlockReward, _					= big.NewInt(0).SetString(RewardString, 10)
+	DefaultRewardValue						= "50000000000000000000" //5e+19
+	DefaultRewardBigInt, _				= big.NewInt(0).SetString(DefaultRewardValue, 10)
+	PopcornRewardValue						= "30000000000000000000" //3e+19
+	PopcornRewardBigInt, _				= big.NewInt(0).SetString(PopcornRewardValue, 10)
+	SeaPopRewardValue							= "10000000000000000000" //1e+19
+	SeaPopRewardBigInt, _					= big.NewInt(0).SetString(SeaPopRewardValue, 10)
 
-	FrontierBlockReward           = DefaultBlockReward // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward          = DefaultBlockReward // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward     = DefaultBlockReward // Block reward in wei for successfully mining a block upward from Constantinople
+	FrontierBlockReward           = DefaultRewardBigInt // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward          = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward     = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Constantinople
+	PopcornBlockReward          	= PopcornRewardBigInt // Block reward in wei for successfully mining a block upward from Popcorn
+	SeaPopBlockReward     				= SeaPopRewardBigInt // Block reward in wei for successfully mining a block upward from SeaPop
 	maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
 	allowedFutureBlockTimeSeconds = int64(15)         // Max seconds from current time allowed for blocks, before they're considered future blocks
+
+	// PopSong hard fork update.
+	// Decrease average block time to 6 ~ 11s.
+	// It offsets the bomb 3M blocks from Eip2384, so in total 12M blocks.
+	calcDifficultyPopSong = makePopcateumDifficultyCalculator(big.NewInt(12000000))
 
 	// calcDifficultyEip2384 is the difficulty adjustment algorithm as specified by EIP 2384.
 	// It offsets the bomb 4M blocks from Constantinople, so in total 9M blocks.
@@ -328,6 +339,8 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 	switch {
 	case config.IsCatalyst(next):
 		return big.NewInt(1)
+	case config.IsPopSong(next):
+		return calcDifficultyPopSong(time, parent)
 	case config.IsMuirGlacier(next):
 		return calcDifficultyEip2384(time, parent)
 	case config.IsConstantinople(next):
@@ -346,10 +359,74 @@ var (
 	expDiffPeriod = big.NewInt(100000)
 	big1          = big.NewInt(1)
 	big2          = big.NewInt(2)
+	big6          = big.NewInt(6)
 	big9          = big.NewInt(9)
 	big10         = big.NewInt(10)
 	bigMinus99    = big.NewInt(-99)
 )
+
+// makePopcateumDifficultyCalculator creates a difficultyCalculator with the given bomb-delay.
+// the difficulty is calculated with Byzantium rules, which differs from Homestead in
+// how uncles affect the calculation
+func makePopcateumDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
+	// Note, the calculations below looks at the parent number, which is 1 below
+	// the block number. Thus we remove one from the delay given
+	bombDelayFromParent := new(big.Int).Sub(bombDelay, big1)
+	return func(time uint64, parent *types.Header) *big.Int {
+		// https://github.com/popcateum/EIPs/issues/100.
+		// algorithm:
+		// diff = (parent_diff +
+		//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
+		//        ) + 2^(periodCount - 2)
+
+		bigTime := new(big.Int).SetUint64(time)
+		bigParentTime := new(big.Int).SetUint64(parent.Time)
+
+		// holds intermediate values to make the algo easier to read & audit
+		x := new(big.Int)
+		y := new(big.Int)
+
+		// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 6
+		x.Sub(bigTime, bigParentTime)
+		x.Div(x, big6)
+		if parent.UncleHash == types.EmptyUncleHash {
+			x.Sub(big1, x)
+		} else {
+			x.Sub(big2, x)
+		}
+		// max((2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 9, -99)
+		if x.Cmp(bigMinus99) < 0 {
+			x.Set(bigMinus99)
+		}
+		// parent_diff + (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
+		y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
+		x.Mul(y, x)
+		x.Add(parent.Difficulty, x)
+
+		// minimum difficulty can ever be (before exponential factor)
+		if x.Cmp(params.MinimumDifficulty) < 0 {
+			x.Set(params.MinimumDifficulty)
+		}
+		// calculate a fake block number for the ice-age delay
+		// Specification: https://eips.popcateum.org/EIPS/eip-1234
+		fakeBlockNumber := new(big.Int)
+		if parent.Number.Cmp(bombDelayFromParent) >= 0 {
+			fakeBlockNumber = fakeBlockNumber.Sub(parent.Number, bombDelayFromParent)
+		}
+		// for the exponential factor
+		periodCount := fakeBlockNumber
+		periodCount.Div(periodCount, expDiffPeriod)
+
+		// the exponential factor, commonly referred to as "the bomb"
+		// diff = diff + 2^(periodCount - 2)
+		if periodCount.Cmp(big1) > 0 {
+			y.Sub(periodCount, big2)
+			y.Exp(big2, y, nil)
+			x.Add(x, y)
+		}
+		return x
+	}
+}
 
 // makeDifficultyCalculator creates a difficultyCalculator with the given bomb-delay.
 // the difficulty is calculated with Byzantium rules, which differs from Homestead in
@@ -500,6 +577,7 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 var FrontierDifficultyCalulator = calcDifficultyFrontier
 var HomesteadDifficultyCalulator = calcDifficultyHomestead
 var DynamicDifficultyCalculator = makeDifficultyCalculator
+var DynamicPopcateumDifficultyCalculator = makePopcateumDifficultyCalculator
 
 // verifySeal checks whether a block satisfies the PoW difficulty requirements,
 // either using the usual ethash cache for it, or alternatively using a full DAG
@@ -640,6 +718,12 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	}
 	if config.IsConstantinople(header.Number) {
 		blockReward = ConstantinopleBlockReward
+	}
+	if config.IsPopcorn(header.Number) {
+		blockReward = PopcornBlockReward
+	}
+	if config.IsSeaPop(header.Number) {
+		blockReward = SeaPopBlockReward
 	}
 	// Accumulate the rewards for the miner and any included uncles
 	reward := new(big.Int).Set(blockReward)

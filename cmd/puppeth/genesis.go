@@ -46,6 +46,8 @@ type alethGenesisSpec struct {
 		ConstantinopleForkBlock    *hexutil.Big           `json:"constantinopleForkBlock,omitempty"`
 		ConstantinopleFixForkBlock *hexutil.Big           `json:"constantinopleFixForkBlock,omitempty"`
 		IstanbulForkBlock          *hexutil.Big           `json:"istanbulForkBlock,omitempty"`
+		PopcornForkBlock           *hexutil.Big           `json:"popcornForkBlock,omitempty"`
+		SeaPopForkBlock          	 *hexutil.Big           `json:"seapopForkBlock,omitempty"`
 		MinGasLimit                hexutil.Uint64         `json:"minGasLimit"`
 		MaxGasLimit                hexutil.Uint64         `json:"maxGasLimit"`
 		TieBreakingGas             bool                   `json:"tieBreakingGas"`
@@ -134,6 +136,12 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	}
 	if num := genesis.Config.IstanbulBlock; num != nil {
 		spec.Params.IstanbulForkBlock = (*hexutil.Big)(num)
+	}
+	if num := genesis.Config.PopcornBlock; num != nil {
+		spec.Params.PopcornForkBlock = (*hexutil.Big)(num)
+	}
+	if num := genesis.Config.SeaPopBlock; num != nil {
+		spec.Params.SeaPopForkBlock = (*hexutil.Big)(num)
 	}
 	spec.Params.NetworkID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.ChainID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
@@ -412,6 +420,14 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	if num := genesis.Config.IstanbulBlock; num != nil {
 		spec.setIstanbul(num)
 	}
+	// Popcorn
+	if num := genesis.Config.PopcornBlock; num != nil {
+		spec.setPopcorn(num)
+	}
+	// SeaPop
+	if num := genesis.Config.SeaPopBlock; num != nil {
+		spec.setSeaPop(num)
+	}
 	spec.Params.MaximumExtraDataSize = (hexutil.Uint64)(params.MaximumExtraDataSize)
 	spec.Params.MinGasLimit = (hexutil.Uint64)(params.MinGasLimit)
 	spec.Params.GasLimitBoundDivisor = (math2.HexOrDecimal64)(params.GasLimitBoundDivisor)
@@ -588,6 +604,14 @@ func (spec *parityChainSpec) setIstanbul(num *big.Int) {
 	spec.Params.EIP1884Transition = hexutil.Uint64(num.Uint64())
 	spec.Params.EIP2028Transition = hexutil.Uint64(num.Uint64())
 	spec.Params.EIP1283ReenableTransition = hexutil.Uint64(num.Uint64())
+}
+
+func (spec *parityChainSpec) setPopcorn(num *big.Int) {
+	spec.Engine.Ethash.Params.BlockReward[hexutil.EncodeBig(num)] = hexutil.EncodeBig(ethash.PopcornBlockReward)
+}
+
+func (spec *parityChainSpec) setSeaPop(num *big.Int) {
+	spec.Engine.Ethash.Params.BlockReward[hexutil.EncodeBig(num)] = hexutil.EncodeBig(ethash.SeaPopBlockReward)
 }
 
 // pyPopcateumGenesisSpec represents the genesis specification format used by the
