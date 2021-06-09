@@ -192,10 +192,10 @@ func MakeDifficultyCalculatorU256(bombDelay *big.Int) func(time uint64, parent *
 	}
 }
 
-// makePopcateumDifficultyCalculatorU256 creates a difficultyCalculator with the given bomb-delay.
+// MakePopcateumDifficultyCalculatorU256 creates a difficultyCalculator with the given bomb-delay.
 // the difficulty is calculated with PopSong rules, which differs from Muir Glacier in
 // how uncles affect the calculation
-func makePopcateumDifficultyCalculatorU256(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
+func MakePopcateumDifficultyCalculatorU256(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
 	// Note, the calculations below looks at the parent number, which is 1 below
 	// the block number. Thus we remove one from the delay given
 	bombDelayFromParent := bombDelay.Uint64() - 1
