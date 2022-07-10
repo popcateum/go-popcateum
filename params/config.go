@@ -687,7 +687,7 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
-		IsPopSong:        c.IsPopSong(num),
+		// IsPopSong:        c.IsPopSong(num),
 		IsBubblePop:      c.IsBubblePop(num),
 		IsPopcorn:        c.IsPopcorn(num),
 		IsSeaPop:         c.IsSeaPop(num),
