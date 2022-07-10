@@ -69,6 +69,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		PopSongBlock:        big.NewInt(85_000),
+		BubblePopBlock:      big.NewInt(3_993_850),
 		PopcornBlock:        big.NewInt(4_000_000),
 		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
@@ -111,6 +112,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(10),
 		BerlinBlock:         big.NewInt(10),
 		PopSongBlock:        big.NewInt(100_000),
+		BubblePopBlock:      big.NewInt(3_993_850),
 		PopcornBlock:        big.NewInt(4_000_000),
 		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
@@ -153,6 +155,7 @@ var (
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         big.NewInt(8_290_928),
 		PopSongBlock:        nil,
+		BubblePopBlock:      nil,
 		PopcornBlock:        nil,
 		SeaPopBlock:         nil,
 		Clique: &CliqueConfig{
@@ -162,14 +165,10 @@ var (
 	}
 
 	// RinkebyTrustedCheckpoint contains the light client trusted checkpoint for the Rinkeby test network.
-	RinkebyTrustedCheckpoint = &TrustedCheckpoint{
-		
-	}
+	RinkebyTrustedCheckpoint = &TrustedCheckpoint{}
 
 	// RinkebyCheckpointOracle contains a set of configs for the Rinkeby test network oracle.
-	RinkebyCheckpointOracle = &CheckpointOracleConfig{
-		
-	}
+	RinkebyCheckpointOracle = &CheckpointOracleConfig{}
 
 	// GoerliChainConfig contains the chain parameters to run a node on the Görli test network.
 	GoerliChainConfig = &ChainConfig{
@@ -187,6 +186,7 @@ var (
 		MuirGlacierBlock:    nil,
 		BerlinBlock:         big.NewInt(4_460_644),
 		PopSongBlock:        nil,
+		BubblePopBlock:      nil,
 		PopcornBlock:        nil,
 		SeaPopBlock:         nil,
 		Clique: &CliqueConfig{
@@ -196,14 +196,10 @@ var (
 	}
 
 	// GoerliTrustedCheckpoint contains the light client trusted checkpoint for the Görli test network.
-	GoerliTrustedCheckpoint = &TrustedCheckpoint{
-		
-	}
+	GoerliTrustedCheckpoint = &TrustedCheckpoint{}
 
 	// GoerliCheckpointOracle contains a set of configs for the Goerli test network oracle.
-	GoerliCheckpointOracle = &CheckpointOracleConfig{
-		
-	}
+	GoerliCheckpointOracle = &CheckpointOracleConfig{}
 
 	// YoloV3ChainConfig contains the chain parameters to run a node on the YOLOv3 test network.
 	YoloV3ChainConfig = &ChainConfig{
@@ -235,16 +231,16 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Popcateum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(EthashConfig), nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -310,7 +306,7 @@ type ChainConfig struct {
 	DAOForkSupport bool     `json:"daoForkSupport,omitempty"` // Whether the nodes supports or opposes the DAO hard-fork
 
 	// EIP150 implements the Gas price changes (https://github.com/popcateum/EIPs/issues/150)
-	EIP150Block *big.Int    `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
+	EIP150Block *big.Int `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
 
 	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
 	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
@@ -322,9 +318,10 @@ type ChainConfig struct {
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
 
-	PopSongBlock         *big.Int `json:"popsongBlock,omitempty"`         // PopSong switch block (nil = no fork, 0 = already on popsong)
-	PopcornBlock         *big.Int `json:"popcornBlock,omitempty"`         // Popcorn switch block (nil = no fork, 0 = already on popcorn)
-	SeaPopBlock         *big.Int `json:"seapopBlock,omitempty"`         // SeaPop switch block (nil = no fork, 0 = already on seapop)
+	PopSongBlock   *big.Int `json:"popsongBlock,omitempty"`   // PopSong switch block (nil = no fork, 0 = already on popsong)
+	BubblePopBlock *big.Int `json:"bubblepopBlock,omitempty"` // BubblePop switch block (nil = no fork, 0 = already on popsong)
+	PopcornBlock   *big.Int `json:"popcornBlock,omitempty"`   // Popcorn switch block (nil = no fork, 0 = already on popcorn)
+	SeaPopBlock    *big.Int `json:"seapopBlock,omitempty"`    // SeaPop switch block (nil = no fork, 0 = already on seapop)
 
 	YoloV3Block   *big.Int `json:"yoloV3Block,omitempty"`   // YOLO v3: Gas repricings TODO @holiman add EIP references
 	EWASMBlock    *big.Int `json:"ewasmBlock,omitempty"`    // EWASM switch block (nil = no fork, 0 = already activated)
@@ -365,7 +362,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, Pop Song: %v, Popcorn: %v, Sea Pop: %v, YOLO v3: %v, Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Berlin: %v, Pop Song: %v, Bubble Pop: %v, Popcorn: %v, Sea Pop: %v, YOLO v3: %v, Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -380,6 +377,7 @@ func (c *ChainConfig) String() string {
 		c.MuirGlacierBlock,
 		c.BerlinBlock,
 		c.PopSongBlock,
+		c.BubblePopBlock,
 		c.PopcornBlock,
 		c.SeaPopBlock,
 		c.YoloV3Block,
@@ -449,6 +447,11 @@ func (c *ChainConfig) IsPopSong(num *big.Int) bool {
 	return isForked(c.PopSongBlock, num)
 }
 
+// IsBubblePop returns whether num is either equal to the BubblePop fork block or greater.
+func (c *ChainConfig) IsBubblePop(num *big.Int) bool {
+	return isForked(c.BubblePopBlock, num)
+}
+
 // IsPopcorn returns whether num is either equal to the Popcorn fork block or greater.
 func (c *ChainConfig) IsPopcorn(num *big.Int) bool {
 	return isForked(c.PopcornBlock, num)
@@ -509,6 +512,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
 		{name: "berlinBlock", block: c.BerlinBlock},
 		{name: "popsongBlock", block: c.PopSongBlock},
+		{name: "bubblepopBlock", block: c.BubblePopBlock},
 		{name: "popcornBlock", block: c.PopcornBlock},
 		{name: "seapopBlock", block: c.SeaPopBlock},
 	} {
@@ -579,6 +583,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	}
 	if isForkIncompatible(c.PopSongBlock, newcfg.PopSongBlock, head) {
 		return newCompatError("PopSong fork block", c.PopSongBlock, newcfg.PopSongBlock)
+	}
+	if isForkIncompatible(c.BubblePopBlock, newcfg.BubblePopBlock, head) {
+		return newCompatError("BubblePop fork block", c.BubblePopBlock, newcfg.BubblePopBlock)
 	}
 	if isForkIncompatible(c.PopcornBlock, newcfg.PopcornBlock, head) {
 		return newCompatError("Popcorn fork block", c.PopcornBlock, newcfg.PopcornBlock)
@@ -659,7 +666,8 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsPopcorn, IsSeaPop, IsCatalyst               bool
+	IsBerlin, IsPopSong, IsBubblePop, IsPopcorn, IsSeaPop   bool
+	IsCatalyst                                              bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -679,6 +687,8 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
+		IsPopSong:        c.IsPopSong(num),
+		IsBubblePop:      c.IsBubblePop(num),
 		IsPopcorn:        c.IsPopcorn(num),
 		IsSeaPop:         c.IsSeaPop(num),
 		IsCatalyst:       c.IsCatalyst(num),

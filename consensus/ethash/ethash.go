@@ -232,8 +232,8 @@ func newCache(epoch uint64) interface{} {
 // generate ensures that the cache content is generated before use.
 func (c *cache) generate(dir string, limit int, lock bool, test bool) {
 	c.once.Do(func() {
-		size := cacheSize(c.epoch*epochLength + 1)
-		seed := seedHash(c.epoch*epochLength + 1)
+		size := cacheSize(c.epoch*epochLengthDefault + 1)
+		seed := seedHash(c.epoch*epochLengthDefault + 1)
 		if test {
 			size = 1024
 		}
@@ -274,7 +274,7 @@ func (c *cache) generate(dir string, limit int, lock bool, test bool) {
 		}
 		// Iterate over all previous instances and delete old ones
 		for ep := int(c.epoch) - limit; ep >= 0; ep-- {
-			seed := seedHash(uint64(ep)*epochLength + 1)
+			seed := seedHash(uint64(ep)*epochLengthDefault + 1)
 			path := filepath.Join(dir, fmt.Sprintf("cache-R%d-%x%s", algorithmRevision, seed[:8], endian))
 			os.Remove(path)
 		}
@@ -312,9 +312,9 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 		// Mark the dataset generated after we're done. This is needed for remote
 		defer atomic.StoreUint32(&d.done, 1)
 
-		csize := cacheSize(d.epoch*epochLength + 1)
-		dsize := datasetSize(d.epoch*epochLength + 1)
-		seed := seedHash(d.epoch*epochLength + 1)
+		csize := cacheSize(d.epoch*epochLengthDefault + 1)
+		dsize := datasetSize(d.epoch*epochLengthDefault + 1)
+		seed := seedHash(d.epoch*epochLengthDefault + 1)
 		if test {
 			csize = 1024
 			dsize = 32 * 1024
@@ -363,7 +363,7 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 		}
 		// Iterate over all previous instances and delete old ones
 		for ep := int(d.epoch) - limit; ep >= 0; ep-- {
-			seed := seedHash(uint64(ep)*epochLength + 1)
+			seed := seedHash(uint64(ep)*epochLengthDefault + 1)
 			path := filepath.Join(dir, fmt.Sprintf("full-R%d-%x%s", algorithmRevision, seed[:8], endian))
 			os.Remove(path)
 		}
@@ -388,13 +388,13 @@ func (d *dataset) finalizer() {
 
 // MakeCache generates a new ethash cache and optionally stores it to disk.
 func MakeCache(block uint64, dir string) {
-	c := cache{epoch: block / epochLength}
+	c := cache{epoch: block / epochLengthDefault}
 	c.generate(dir, math.MaxInt32, false, false)
 }
 
 // MakeDataset generates a new ethash dataset and optionally stores it to disk.
 func MakeDataset(block uint64, dir string) {
-	d := dataset{epoch: block / epochLength}
+	d := dataset{epoch: block / epochLengthDefault}
 	d.generate(dir, math.MaxInt32, false, false)
 }
 
@@ -561,7 +561,7 @@ func (ethash *Ethash) Close() error {
 // by first checking against a list of in-memory caches, then against caches
 // stored on disk, and finally generating one if none can be found.
 func (ethash *Ethash) cache(block uint64) *cache {
-	epoch := block / epochLength
+	epoch := block / epochLengthDefault
 	currentI, futureI := ethash.caches.get(epoch)
 	current := currentI.(*cache)
 
@@ -584,7 +584,7 @@ func (ethash *Ethash) cache(block uint64) *cache {
 // generates on a background thread.
 func (ethash *Ethash) dataset(block uint64, async bool) *dataset {
 	// Retrieve the requested ethash dataset
-	epoch := block / epochLength
+	epoch := block / epochLengthDefault
 	currentI, futureI := ethash.datasets.get(epoch)
 	current := currentI.(*dataset)
 

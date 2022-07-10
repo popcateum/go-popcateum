@@ -66,6 +66,7 @@ func setDefaults(cfg *Config) {
 			MuirGlacierBlock:    new(big.Int),
 			BerlinBlock:         new(big.Int),
 			PopSongBlock:        new(big.Int),
+			BubblePopBlock:      new(big.Int),
 			PopcornBlock:        new(big.Int),
 			SeaPopBlock:         new(big.Int),
 			YoloV3Block:         nil,
