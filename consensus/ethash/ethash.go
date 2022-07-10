@@ -723,6 +723,6 @@ func (ethash *Ethash) GetBubblePopBlockNumber() *uint64 {
 	return ethash.config.BubblePopBlock
 }
 
-func (ethash *Ethash) GetBubblePopBlock() *uint64 {
-	return ethash.GetBubblePopBlockNumber()
-}
+// func GetBubblePopBlock() *uint64 {
+// 	return ethash.GetBubblePopBlockNumber()
+// }

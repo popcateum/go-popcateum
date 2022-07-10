@@ -2013,13 +2013,13 @@ func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (strin
 }
 
 // SeedHash retrieves the seed hash of a block.
-func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64, blocks *uint64) (string, error) {
+func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64) (string, error) {
 	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
-	// ecip1099FBlock := ethash.GetBubblePopBlock()
-	epochLength := ethash.CalcEpochLength(number, blocks)
+	// blocks := ethash.GetBubblePopBlock()
+	epochLength := ethash.CalcEpochLength(number, nil)
 	epoch := ethash.CalcEpoch(number, epochLength)
 	return fmt.Sprintf("0x%x", ethash.SeedHash(epoch, epochLength)), nil
 }
