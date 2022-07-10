@@ -318,6 +318,11 @@ var (
 		Name:  "ethash.dagslockmmap",
 		Usage: "Lock memory maps for recent ethash mining DAGs",
 	}
+	EthashEpochLengthFlag = cli.Int64Flag{
+		Name:  "epoch.length",
+		Usage: "Sets epoch length for makecache & makedag commands",
+		Value: 30000,
+	}
 	// Transaction pool settings
 	TxPoolLocalsFlag = cli.StringFlag{
 		Name:  "txpool.locals",

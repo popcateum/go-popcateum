@@ -47,6 +47,9 @@ var (
 		Name:      "makecache",
 		Usage:     "Generate ethash verification cache (for testing)",
 		ArgsUsage: "<blockNum> <outputDir>",
+		Flags: []cli.Flag{
+			utils.EthashEpochLengthFlag,
+		},
 		Category:  "MISCELLANEOUS COMMANDS",
 		Description: `
 The makecache command generates an ethash cache in <outputDir>.
@@ -60,6 +63,9 @@ Regular users do not need to execute it.
 		Name:      "makedag",
 		Usage:     "Generate ethash mining DAG (for testing)",
 		ArgsUsage: "<blockNum> <outputDir>",
+		Flags: []cli.Flag{
+			utils.EthashEpochLengthFlag,
+		},
 		Category:  "MISCELLANEOUS COMMANDS",
 		Description: `
 The makedag command generates an ethash DAG in <outputDir>.
@@ -112,7 +118,10 @@ func makecache(ctx *cli.Context) error {
 	if err != nil {
 		utils.Fatalf("Invalid block number: %v", err)
 	}
-	ethash.MakeCache(block, args[1])
+
+	epochLength := ctx.Uint64(utils.EthashEpochLengthFlag.Name)
+
+	ethash.MakeCache(block, epochLength, args[1])
 
 	return nil
 }
@@ -127,7 +136,10 @@ func makedag(ctx *cli.Context) error {
 	if err != nil {
 		utils.Fatalf("Invalid block number: %v", err)
 	}
-	ethash.MakeDataset(block, args[1])
+
+	epochLength := ctx.Uint64(utils.EthashEpochLengthFlag.Name)
+
+	ethash.MakeDataset(block, epochLength,args[1])
 
 	return nil
 }
