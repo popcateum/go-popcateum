@@ -69,7 +69,7 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		PopSongBlock:        big.NewInt(85_000),
-		BubblePopBlock:      big.NewInt(3_993_870),
+		BubblePopBlock:      big.NewInt(3_997_000),
 		PopcornBlock:        big.NewInt(4_000_000),
 		SeaPopBlock:         big.NewInt(9_000_000),
 		Ethash:              new(EthashConfig),
