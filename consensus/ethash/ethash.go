@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package ethash implements the ethash proof-of-work consensus engine.
 package ethash
@@ -34,11 +34,11 @@ import (
 	"unsafe"
 
 	"github.com/edsrzf/mmap-go"
+	lrupkg "github.com/popcateum/go-popcateum/common/lru"
 	"github.com/popcateum/go-popcateum/consensus"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/metrics"
 	"github.com/popcateum/go-popcateum/rpc"
-	"github.com/hashicorp/golang-lru/simplelru"
 )
 
 var ErrInvalidDumpMagic = errors.New("invalid dump magic")
@@ -136,13 +136,16 @@ func memoryMapAndGenerate(path string, size uint64, lock bool, generator func(bu
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err = dump.Truncate(int64(len(dumpMagic))*4 + int64(size)); err != nil {
+	if err = ensureSize(dump, int64(len(dumpMagic))*4+int64(size)); err != nil {
+		dump.Close()
+		os.Remove(temp)
 		return nil, nil, nil, err
 	}
 	// Memory map the file for writing and fill it with the generator
 	mem, buffer, err := memoryMapFile(dump, true)
 	if err != nil {
 		dump.Close()
+		os.Remove(temp)
 		return nil, nil, nil, err
 	}
 	copy(buffer, dumpMagic)
@@ -162,34 +165,45 @@ func memoryMapAndGenerate(path string, size uint64, lock bool, generator func(bu
 	return memoryMap(path, lock)
 }
 
+type cacheOrDataset interface {
+	*cache | *dataset
+}
+
 // lru tracks caches or datasets by their last use time, keeping at most N of them.
-type lru struct {
+type lru[T cacheOrDataset] struct {
 	what string
-	new  func(epoch uint64) interface{}
+	new  func(epoch uint64) T
 	mu   sync.Mutex
 	// Items are kept in a LRU cache, but there is a special case:
 	// We always keep an item for (highest seen epoch) + 1 as the 'future item'.
-	cache      *simplelru.LRU
+	cache      lrupkg.BasicLRU[uint64, T]
 	future     uint64
-	futureItem interface{}
+	futureItem T
 }
 
 // newlru create a new least-recently-used cache for either the verification caches
 // or the mining datasets.
-func newlru(what string, maxItems int, new func(epoch uint64) interface{}) *lru {
-	if maxItems <= 0 {
-		maxItems = 1
+func newlru[T cacheOrDataset](maxItems int, new func(epoch uint64) T) *lru[T] {
+	var what string
+	switch any(T(nil)).(type) {
+	case *cache:
+		what = "cache"
+	case *dataset:
+		what = "dataset"
+	default:
+		panic("unknown type")
 	}
-	cache, _ := simplelru.NewLRU(maxItems, func(key, value interface{}) {
-		log.Trace("Evicted ethash "+what, "epoch", key)
-	})
-	return &lru{what: what, new: new, cache: cache}
+	return &lru[T]{
+		what:  what,
+		new:   new,
+		cache: lrupkg.NewBasicLRU[uint64, T](maxItems),
+	}
 }
 
 // get retrieves or creates an item for the given epoch. The first return value is always
 // non-nil. The second return value is non-nil if lru thinks that an item will be useful in
 // the near future.
-func (lru *lru) get(epoch uint64) (item, future interface{}) {
+func (lru *lru[T]) get(epoch uint64) (item, future T) {
 	lru.mu.Lock()
 	defer lru.mu.Unlock()
 
@@ -223,9 +237,8 @@ type cache struct {
 	once  sync.Once // Ensures the cache is generated only once
 }
 
-// newCache creates a new ethash verification cache and returns it as a plain Go
-// interface to be usable in an LRU cache.
-func newCache(epoch uint64) interface{} {
+// newCache creates a new ethash verification cache.
+func newCache(epoch uint64) *cache {
 	return &cache{epoch: epoch}
 }
 
@@ -275,8 +288,11 @@ func (c *cache) generate(dir string, limit int, lock bool, test bool) {
 		// Iterate over all previous instances and delete old ones
 		for ep := int(c.epoch) - limit; ep >= 0; ep-- {
 			seed := seedHash(uint64(ep)*epochLength + 1)
-			path := filepath.Join(dir, fmt.Sprintf("cache-R%d-%x%s", algorithmRevision, seed[:8], endian))
-			os.Remove(path)
+			path := filepath.Join(dir, fmt.Sprintf("cache-R%d-%x%s*", algorithmRevision, seed[:8], endian))
+			files, _ := filepath.Glob(path) // find also the temp files that are generated.
+			for _, file := range files {
+				os.Remove(file)
+			}
 		}
 	})
 }
@@ -292,17 +308,17 @@ func (c *cache) finalizer() {
 
 // dataset wraps an ethash dataset with some metadata to allow easier concurrent use.
 type dataset struct {
-	epoch   uint64    // Epoch for which this cache is relevant
-	dump    *os.File  // File descriptor of the memory mapped cache
-	mmap    mmap.MMap // Memory map itself to unmap before releasing
-	dataset []uint32  // The actual cache data content
-	once    sync.Once // Ensures the cache is generated only once
-	done    uint32    // Atomic flag to determine generation status
+	epoch   uint64      // Epoch for which this cache is relevant
+	dump    *os.File    // File descriptor of the memory mapped cache
+	mmap    mmap.MMap   // Memory map itself to unmap before releasing
+	dataset []uint32    // The actual cache data content
+	once    sync.Once   // Ensures the cache is generated only once
+	done    atomic.Bool // Atomic flag to determine generation status
 }
 
 // newDataset creates a new ethash mining dataset and returns it as a plain Go
 // interface to be usable in an LRU cache.
-func newDataset(epoch uint64) interface{} {
+func newDataset(epoch uint64) *dataset {
 	return &dataset{epoch: epoch}
 }
 
@@ -310,7 +326,7 @@ func newDataset(epoch uint64) interface{} {
 func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 	d.once.Do(func() {
 		// Mark the dataset generated after we're done. This is needed for remote
-		defer atomic.StoreUint32(&d.done, 1)
+		defer d.done.Store(true)
 
 		csize := cacheSize(d.epoch*epochLength + 1)
 		dsize := datasetSize(d.epoch*epochLength + 1)
@@ -358,7 +374,7 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 		if err != nil {
 			logger.Error("Failed to generate mapped ethash dataset", "err", err)
 
-			d.dataset = make([]uint32, dsize/2)
+			d.dataset = make([]uint32, dsize/4)
 			generateDataset(d.dataset, d.epoch, cache)
 		}
 		// Iterate over all previous instances and delete old ones
@@ -374,7 +390,7 @@ func (d *dataset) generate(dir string, limit int, lock bool, test bool) {
 // or not (it may not have been started at all). This is useful for remote miners
 // to default to verification caches instead of blocking on DAG generations.
 func (d *dataset) generated() bool {
-	return atomic.LoadUint32(&d.done) == 1
+	return d.done.Load()
 }
 
 // finalizer closes any file handlers and memory maps open.
@@ -433,8 +449,8 @@ type Config struct {
 type Ethash struct {
 	config Config
 
-	caches   *lru // In memory caches to avoid regenerating too often
-	datasets *lru // In memory datasets to avoid regenerating too often
+	caches   *lru[*cache]   // In memory caches to avoid regenerating too often
+	datasets *lru[*dataset] // In memory datasets to avoid regenerating too often
 
 	// Mining related fields
 	rand     *rand.Rand    // Properly seeded random source for nonces
@@ -471,8 +487,8 @@ func New(config Config, notify []string, noverify bool) *Ethash {
 	}
 	ethash := &Ethash{
 		config:   config,
-		caches:   newlru("cache", config.CachesInMem, newCache),
-		datasets: newlru("dataset", config.DatasetsInMem, newDataset),
+		caches:   newlru(config.CachesInMem, newCache),
+		datasets: newlru(config.DatasetsInMem, newDataset),
 		update:   make(chan struct{}),
 		hashrate: metrics.NewMeterForced(),
 	}
@@ -490,7 +506,7 @@ func NewTester(notify []string, noverify bool) *Ethash {
 }
 
 // NewFaker creates a ethash consensus engine with a fake PoW scheme that accepts
-// all blocks' seal as valid, though they still have to conform to the Popcateum
+// all blocks' seal as valid, though they still have to conform to the Ethereum
 // consensus rules.
 func NewFaker() *Ethash {
 	return &Ethash{
@@ -503,7 +519,7 @@ func NewFaker() *Ethash {
 
 // NewFakeFailer creates a ethash consensus engine with a fake PoW scheme that
 // accepts all blocks as valid apart from the single one specified, though they
-// still have to conform to the Popcateum consensus rules.
+// still have to conform to the Ethereum consensus rules.
 func NewFakeFailer(fail uint64) *Ethash {
 	return &Ethash{
 		config: Config{
@@ -516,7 +532,7 @@ func NewFakeFailer(fail uint64) *Ethash {
 
 // NewFakeDelayer creates a ethash consensus engine with a fake PoW scheme that
 // accepts all blocks as valid, but delays verifications by some time, though
-// they still have to conform to the Popcateum consensus rules.
+// they still have to conform to the Ethereum consensus rules.
 func NewFakeDelayer(delay time.Duration) *Ethash {
 	return &Ethash{
 		config: Config{
@@ -546,6 +562,11 @@ func NewShared() *Ethash {
 
 // Close closes the exit channel to notify all backend threads exiting.
 func (ethash *Ethash) Close() error {
+	return ethash.StopRemoteSealer()
+}
+
+// StopRemoteSealer stops the remote sealer
+func (ethash *Ethash) StopRemoteSealer() error {
 	ethash.closeOnce.Do(func() {
 		// Short circuit if the exit channel is not allocated.
 		if ethash.remote == nil {
@@ -562,15 +583,13 @@ func (ethash *Ethash) Close() error {
 // stored on disk, and finally generating one if none can be found.
 func (ethash *Ethash) cache(block uint64) *cache {
 	epoch := block / epochLength
-	currentI, futureI := ethash.caches.get(epoch)
-	current := currentI.(*cache)
+	current, future := ethash.caches.get(epoch)
 
 	// Wait for generation finish.
 	current.generate(ethash.config.CacheDir, ethash.config.CachesOnDisk, ethash.config.CachesLockMmap, ethash.config.PowMode == ModeTest)
 
 	// If we need a new future cache, now's a good time to regenerate it.
-	if futureI != nil {
-		future := futureI.(*cache)
+	if future != nil {
 		go future.generate(ethash.config.CacheDir, ethash.config.CachesOnDisk, ethash.config.CachesLockMmap, ethash.config.PowMode == ModeTest)
 	}
 	return current
@@ -585,25 +604,20 @@ func (ethash *Ethash) cache(block uint64) *cache {
 func (ethash *Ethash) dataset(block uint64, async bool) *dataset {
 	// Retrieve the requested ethash dataset
 	epoch := block / epochLength
-	currentI, futureI := ethash.datasets.get(epoch)
-	current := currentI.(*dataset)
+	current, future := ethash.datasets.get(epoch)
 
 	// If async is specified, generate everything in a background thread
 	if async && !current.generated() {
 		go func() {
 			current.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
-
-			if futureI != nil {
-				future := futureI.(*dataset)
+			if future != nil {
 				future.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
 			}
 		}()
 	} else {
 		// Either blocking generation was requested, or already done
 		current.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
-
-		if futureI != nil {
-			future := futureI.(*dataset)
+		if future != nil {
 			go future.generate(ethash.config.DatasetDir, ethash.config.DatasetsOnDisk, ethash.config.DatasetsLockMmap, ethash.config.PowMode == ModeTest)
 		}
 	}
@@ -670,15 +684,11 @@ func (ethash *Ethash) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: "eth",
-			Version:   "1.0",
 			Service:   &API{ethash},
-			Public:    true,
 		},
 		{
 			Namespace: "ethash",
-			Version:   "1.0",
 			Service:   &API{ethash},
-			Public:    true,
 		},
 	}
 }

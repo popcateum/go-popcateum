@@ -1,27 +1,27 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rpc
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -65,14 +65,14 @@ func TestWebsocketOriginCheck(t *testing.T) {
 		t.Fatal("no error for wrong origin")
 	}
 	wantErr := wsHandshakeError{websocket.ErrBadHandshake, "403 Forbidden"}
-	if !reflect.DeepEqual(err, wantErr) {
+	if !errors.Is(err, wantErr) {
 		t.Fatalf("wrong error for wrong origin: %q", err)
 	}
 
 	// Connections without origin header should work.
 	client, err = DialWebsocket(context.Background(), wsURL, "")
 	if err != nil {
-		t.Fatal("error for empty origin")
+		t.Fatalf("error for empty origin: %v", err)
 	}
 	client.Close()
 }
@@ -110,6 +110,41 @@ func TestWebsocketLargeCall(t *testing.T) {
 	err = client.Call(&result, "test_echo", arg)
 	if err == nil {
 		t.Fatal("no error for too large call")
+	}
+}
+
+func TestWebsocketPeerInfo(t *testing.T) {
+	var (
+		s     = newTestServer()
+		ts    = httptest.NewServer(s.WebsocketHandler([]string{"origin.example.com"}))
+		tsurl = "ws:" + strings.TrimPrefix(ts.URL, "http:")
+	)
+	defer s.Stop()
+	defer ts.Close()
+
+	ctx := context.Background()
+	c, err := DialWebsocket(ctx, tsurl, "origin.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Request peer information.
+	var connInfo PeerInfo
+	if err := c.Call(&connInfo, "test_peerInfo"); err != nil {
+		t.Fatal(err)
+	}
+
+	if connInfo.RemoteAddr == "" {
+		t.Error("RemoteAddr not set")
+	}
+	if connInfo.Transport != "ws" {
+		t.Errorf("wrong Transport %q", connInfo.Transport)
+	}
+	if connInfo.HTTP.UserAgent != "Go-http-client/1.1" {
+		t.Errorf("wrong HTTP.UserAgent %q", connInfo.HTTP.UserAgent)
+	}
+	if connInfo.HTTP.Origin != "origin.example.com" {
+		t.Errorf("wrong HTTP.Origin %q", connInfo.HTTP.UserAgent)
 	}
 }
 

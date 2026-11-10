@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package common
 
@@ -128,7 +128,7 @@ func TestAddressHexChecksum(t *testing.T) {
 		Input  string
 		Output string
 	}{
-		// Test cases from https://github.com/popcateum/EIPs/blob/master/EIPS/eip-55.md#specification
+		// Test cases from https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md#specification
 		{"0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed", "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"},
 		{"0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359", "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359"},
 		{"0xdbf03b407c01e7cd3cbea99509d93f8dddc8c6fb", "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB"},
@@ -154,9 +154,33 @@ func BenchmarkAddressHex(b *testing.B) {
 	}
 }
 
-func TestMixedcaseAccount_Address(t *testing.T) {
+// Test checks if the customized json marshaller of MixedcaseAddress object
+// is invoked correctly. In golang the struct pointer will inherit the
+// non-pointer receiver methods, the reverse is not true. In the case of
+// MixedcaseAddress, it must define the MarshalJSON method in the object
+// but not the pointer level, so that this customized marshalled can be used
+// for both MixedcaseAddress object and pointer.
+func TestMixedcaseAddressMarshal(t *testing.T) {
+	var (
+		output string
+		input  = "0xae967917c465db8578ca9024c205720b1a3651A9"
+	)
+	addr, err := NewMixedcaseAddressFromString(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob, err := json.Marshal(*addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(blob, &output)
+	if output != input {
+		t.Fatal("Failed to marshal/unmarshal MixedcaseAddress object")
+	}
+}
 
-	// https://github.com/popcateum/EIPs/blob/master/EIPS/eip-55.md
+func TestMixedcaseAccount_Address(t *testing.T) {
+	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
 	// Note: 0X{checksum_addr} is not valid according to spec above
 
 	var res []struct {
@@ -178,7 +202,7 @@ func TestMixedcaseAccount_Address(t *testing.T) {
 		}
 	}
 
-	//These should throw exceptions:
+	// These should throw exceptions:
 	var r2 []MixedcaseAddress
 	for _, r := range []string{
 		`["0x11111111111111111111122222222222233333"]`,     // Too short
@@ -192,9 +216,7 @@ func TestMixedcaseAccount_Address(t *testing.T) {
 		if err := json.Unmarshal([]byte(r), &r2); err == nil {
 			t.Errorf("Expected failure, input %v", r)
 		}
-
 	}
-
 }
 
 func TestHash_Scan(t *testing.T) {

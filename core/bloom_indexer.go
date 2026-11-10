@@ -1,18 +1,18 @@
-// Copyright 2021 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
@@ -35,7 +35,7 @@ const (
 )
 
 // BloomIndexer implements a core.ChainIndexer, building up a rotated bloom bits index
-// for the Popcateum header bloom filters, permitting blazing fast filtering.
+// for the Ethereum header bloom filters, permitting blazing fast filtering.
 type BloomIndexer struct {
 	size    uint64               // section size to generate bloombits for
 	db      ethdb.Database       // database instance to write index data and metadata into
@@ -75,7 +75,7 @@ func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error 
 // Commit implements core.ChainIndexerBackend, finalizing the bloom section and
 // writing it out into the database.
 func (b *BloomIndexer) Commit() error {
-	batch := b.db.NewBatch()
+	batch := b.db.NewBatchWithSize((int(b.size) / 8) * types.BloomBitLength)
 	for i := 0; i < types.BloomBitLength; i++ {
 		bits, err := b.gen.Bitset(uint(i))
 		if err != nil {

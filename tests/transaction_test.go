@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package tests
 
@@ -37,17 +37,17 @@ func TestTransaction(t *testing.T) {
 	// calculating the final cozt
 	txt.skipLoad(".*TransactionWithGasPriceOverflow.*")
 
-	// The nonce is too large for uint64. Not a concern, it means gpop won't
+	// The nonce is too large for uint64. Not a concern, it means geth won't
 	// accept transactions at a certain point in the distant future
 	txt.skipLoad("^ttNonce/TransactionWithHighNonce256.json")
 
 	// The value is larger than uint64, which according to the test is invalid.
-	// Gpop accepts it, which is not a consensus issue since we use big.Int's
+	// Geth accepts it, which is not a consensus issue since we use big.Int's
 	// internally to calculate the cost
 	txt.skipLoad("^ttValue/TransactionWithHighValueOverflow.json")
 	txt.walk(t, transactionTestDir, func(t *testing.T, name string, test *TransactionTest) {
 		cfg := params.MainnetChainConfig
-		if err := txt.checkFailure(t, name, test.Run(cfg)); err != nil {
+		if err := txt.checkFailure(t, test.Run(cfg)); err != nil {
 			t.Error(err)
 		}
 	})

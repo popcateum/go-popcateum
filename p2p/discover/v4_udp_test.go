@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package discover
 
@@ -64,7 +64,7 @@ func newUDPTest(t *testing.T) *udpTest {
 		pipe:       newpipe(),
 		localkey:   newkey(),
 		remotekey:  newkey(),
-		remoteaddr: &net.UDPAddr{IP: net.IP{10, 0, 1, 99}, Port: 60606},
+		remoteaddr: &net.UDPAddr{IP: net.IP{10, 0, 1, 99}, Port: 30303},
 	}
 
 	test.db, _ = enode.OpenDB("")
@@ -165,7 +165,6 @@ func TestUDPv4_responseTimeouts(t *testing.T) {
 	test := newUDPTest(t)
 	defer test.close()
 
-	rand.Seed(time.Now().UnixNano())
 	randomDuration := func(max time.Duration) time.Duration {
 		return time.Duration(rand.Int63n(int64(max)))
 	}
@@ -284,6 +283,7 @@ func TestUDPv4_findnode(t *testing.T) {
 		test.waitPacketOut(func(p *v4wire.Neighbors, to *net.UDPAddr, hash []byte) {
 			if len(p.Nodes) != len(want) {
 				t.Errorf("wrong number of results: got %d, want %d", len(p.Nodes), bucketSize)
+				return
 			}
 			for i, n := range p.Nodes {
 				if n.ID.ID() != want[i].ID() {
@@ -312,7 +312,7 @@ func TestUDPv4_findnodeMultiReply(t *testing.T) {
 	test.table.db.UpdateLastPingReceived(rid, test.remoteaddr.IP, time.Now())
 
 	// queue a pending findnode request
-	resultc, errc := make(chan []*node), make(chan error)
+	resultc, errc := make(chan []*node, 1), make(chan error, 1)
 	go func() {
 		rid := encodePubkey(&test.remotekey.PublicKey).id()
 		ns, err := test.udp.findnode(rid, test.remoteaddr, testTarget)
@@ -333,10 +333,10 @@ func TestUDPv4_findnodeMultiReply(t *testing.T) {
 
 	// send the reply as two packets.
 	list := []*node{
-		wrapNode(enode.MustParse("enode://ba85011c70bcc5c04d8607d3a0ed29aa6179c092cbdda10d5d32684fb33ed01bd94f588ca8f91ac48318087dcb02eaf36773a7a453f0eedd6742af668097b29c@10.0.1.16:60606?discport=30304")),
-		wrapNode(enode.MustParse("enode://81fa361d25f157cd421c60dcc28d8dac5ef6a89476633339c5df30287474520caca09627da18543d9079b5b288698b542d56167aa5c09111e55acdbbdf2ef799@10.0.1.16:60606")),
+		wrapNode(enode.MustParse("enode://ba85011c70bcc5c04d8607d3a0ed29aa6179c092cbdda10d5d32684fb33ed01bd94f588ca8f91ac48318087dcb02eaf36773a7a453f0eedd6742af668097b29c@10.0.1.16:30303?discport=30304")),
+		wrapNode(enode.MustParse("enode://81fa361d25f157cd421c60dcc28d8dac5ef6a89476633339c5df30287474520caca09627da18543d9079b5b288698b542d56167aa5c09111e55acdbbdf2ef799@10.0.1.16:30303")),
 		wrapNode(enode.MustParse("enode://9bffefd833d53fac8e652415f4973bee289e8b1a5c6c4cbe70abf817ce8a64cee11b823b66a987f51aaa9fba0d6a91b3e6bf0d5a5d1042de8e9eeea057b217f8@10.0.1.36:30301?discport=17")),
-		wrapNode(enode.MustParse("enode://1b5b4aa662d7cb44a7221bfba67302590b643028197a7d5214790f3bac7aaa4a3241be9e83c09cf1f6c69d007c634faae3dc1b1221793e8446c0b3a09de65960@10.0.1.16:60606")),
+		wrapNode(enode.MustParse("enode://1b5b4aa662d7cb44a7221bfba67302590b643028197a7d5214790f3bac7aaa4a3241be9e83c09cf1f6c69d007c634faae3dc1b1221793e8446c0b3a09de65960@10.0.1.16:30303")),
 	}
 	rpclist := make([]v4wire.Node, len(list))
 	for i := range list {
@@ -470,13 +470,13 @@ func TestUDPv4_EIP868(t *testing.T) {
 	// Perform endpoint proof and check for sequence number in packet tail.
 	test.packetIn(nil, &v4wire.Ping{Expiration: futureExp})
 	test.waitPacketOut(func(p *v4wire.Pong, addr *net.UDPAddr, hash []byte) {
-		if p.ENRSeq() != wantNode.Seq() {
-			t.Errorf("wrong sequence number in pong: %d, want %d", p.ENRSeq(), wantNode.Seq())
+		if p.ENRSeq != wantNode.Seq() {
+			t.Errorf("wrong sequence number in pong: %d, want %d", p.ENRSeq, wantNode.Seq())
 		}
 	})
 	test.waitPacketOut(func(p *v4wire.Ping, addr *net.UDPAddr, hash []byte) {
-		if p.ENRSeq() != wantNode.Seq() {
-			t.Errorf("wrong sequence number in ping: %d, want %d", p.ENRSeq(), wantNode.Seq())
+		if p.ENRSeq != wantNode.Seq() {
+			t.Errorf("wrong sequence number in ping: %d, want %d", p.ENRSeq, wantNode.Seq())
 		}
 		test.packetIn(nil, &v4wire.Pong{Expiration: futureExp, ReplyTok: hash})
 	})
@@ -489,7 +489,7 @@ func TestUDPv4_EIP868(t *testing.T) {
 			t.Fatalf("invalid record: %v", err)
 		}
 		if !reflect.DeepEqual(n, wantNode) {
-			t.Fatalf("wrong node in enrResponse: %v", n)
+			t.Fatalf("wrong node in ENRResponse: %v", n)
 		}
 	})
 }

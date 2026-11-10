@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package p2p
 
@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/bitutil"
 	"github.com/popcateum/go-popcateum/metrics"
 	"github.com/popcateum/go-popcateum/p2p/rlpx"
@@ -62,6 +63,10 @@ func (t *rlpxTransport) ReadMsg() (Msg, error) {
 	t.conn.SetReadDeadline(time.Now().Add(frameReadTimeout))
 	code, data, wireSize, err := t.conn.Read()
 	if err == nil {
+		// Protocol messages are dispatched to subprotocol handlers asynchronously,
+		// but package rlpx may reuse the returned 'data' buffer on the next call
+		// to Read. Copy the message data to avoid this being an issue.
+		data = common.CopyBytes(data)
 		msg = Msg{
 			ReceivedAt: time.Now(),
 			Code:       code,

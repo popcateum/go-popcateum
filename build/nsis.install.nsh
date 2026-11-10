@@ -1,21 +1,21 @@
-Name "gpop ${MAJORVERSION}.${MINORVERSION}.${BUILDVERSION}" # VERSION variables set through command line arguments
+Name "geth ${MAJORVERSION}.${MINORVERSION}.${BUILDVERSION}" # VERSION variables set through command line arguments
 InstallDir "$InstDir"
 OutFile "${OUTPUTFILE}" # set through command line arguments
 
 # Links for "Add/Remove Programs"
 !define HELPURL "https://github.com/popcateum/go-popcateum/issues"
 !define UPDATEURL "https://github.com/popcateum/go-popcateum/releases"
-!define ABOUTURL "https://github.com/popcateum/go-popcateum#popcateum-go"
+!define ABOUTURL "https://github.com/popcateum/go-popcateum#ethereum-go"
 !define /date NOW "%Y%m%d"
 
 PageEx license
   LicenseData {{.License}}
 PageExEnd
 
-# Install gpop binary
-Section "Gpop" GPOP_IDX
+# Install geth binary
+Section "Geth" GETH_IDX
   SetOutPath $INSTDIR
-  file {{.Gpop}}
+  file {{.Geth}}
 
   # Create start menu launcher
   createDirectory "$SMPROGRAMS\${APPNAME}"
@@ -24,18 +24,18 @@ Section "Gpop" GPOP_IDX
   createShortCut "$SMPROGRAMS\${APPNAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 
   # Firewall - remove rules (if exists)
-  SimpleFC::AdvRemoveRule "Gpop incoming peers (TCP:60606)"
-  SimpleFC::AdvRemoveRule "Gpop outgoing peers (TCP:60606)"
-  SimpleFC::AdvRemoveRule "Gpop UDP discovery (UDP:60606)"
+  SimpleFC::AdvRemoveRule "Geth incoming peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Geth outgoing peers (TCP:60606)"
+  SimpleFC::AdvRemoveRule "Geth UDP discovery (UDP:60606)"
 
   # Firewall - add rules
-  SimpleFC::AdvAddRule "Gpop incoming peers (TCP:60606)" ""  6 1 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" 60606 "" "" ""
-  SimpleFC::AdvAddRule "Gpop outgoing peers (TCP:60606)" ""  6 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 60606 "" ""
-  SimpleFC::AdvAddRule "Gpop UDP discovery (UDP:60606)" "" 17 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Popcateum" "" 60606 "" ""
+  SimpleFC::AdvAddRule "Geth incoming peers (TCP:60606)" ""  6 1 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Ethereum" 60606 "" "" ""
+  SimpleFC::AdvAddRule "Geth outgoing peers (TCP:60606)" ""  6 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Ethereum" "" 60606 "" ""
+  SimpleFC::AdvAddRule "Geth UDP discovery (UDP:60606)" "" 17 2 1 2147483647 1 "$INSTDIR\gpop.exe" "" "" "Ethereum" "" 60606 "" ""
 
-  # Set default IPC endpoint (https://github.com/popcateum/EIPs/issues/147)
-  ${EnvVarUpdate} $0 "POPCATEUM_SOCKET" "R" "HKLM" "\\.\pipe\gpop.ipc"
-  ${EnvVarUpdate} $0 "POPCATEUM_SOCKET" "A" "HKLM" "\\.\pipe\gpop.ipc"
+  # Set default IPC endpoint (https://github.com/ethereum/EIPs/issues/147)
+  ${EnvVarUpdate} $0 "ETHEREUM_SOCKET" "R" "HKLM" "\\.\pipe\geth.ipc"
+  ${EnvVarUpdate} $0 "ETHEREUM_SOCKET" "A" "HKLM" "\\.\pipe\geth.ipc"
 
   # Add instdir to PATH
   Push "$INSTDIR"
@@ -54,8 +54,8 @@ Var GetInstalledSize.total
 Function GetInstalledSize
   StrCpy $GetInstalledSize.total 0
 
-  ${if} ${SectionIsSelected} ${GPOP_IDX}
-    SectionGetSize ${GPOP_IDX} $0
+  ${if} ${SectionIsSelected} ${GETH_IDX}
+    SectionGetSize ${GETH_IDX} $0
     IntOp $GetInstalledSize.total $GetInstalledSize.total + $0
   ${endif}
 

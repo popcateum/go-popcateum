@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package v4test
 
@@ -60,10 +60,10 @@ func newTestEnv(remote string, listen1, listen2 string) *testenv {
 			ip = net.ParseIP("127.0.0.1")
 		}
 		if tcpPort = node.TCP(); tcpPort == 0 {
-			tcpPort = 60606
+			tcpPort = 30303
 		}
 		if udpPort = node.TCP(); udpPort == 0 {
-			udpPort = 60606
+			udpPort = 30303
 		}
 		node = enode.NewV4(node.Pubkey(), ip, tcpPort, udpPort)
 	}

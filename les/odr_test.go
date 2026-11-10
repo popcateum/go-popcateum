@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -31,6 +31,7 @@ import (
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/core/vm"
 	"github.com/popcateum/go-popcateum/ethdb"
@@ -115,12 +116,6 @@ func TestOdrContractCallLes2(t *testing.T) { testOdr(t, 2, 2, true, odrContractC
 func TestOdrContractCallLes3(t *testing.T) { testOdr(t, 3, 2, true, odrContractCall) }
 func TestOdrContractCallLes4(t *testing.T) { testOdr(t, 4, 2, true, odrContractCall) }
 
-type callmsg struct {
-	types.Message
-}
-
-func (callmsg) CheckNonce() bool { return false }
-
 func odrContractCall(ctx context.Context, db ethdb.Database, config *params.ChainConfig, bc *core.BlockChain, lc *light.LightChain, bhash common.Hash) []byte {
 	data := common.Hex2Bytes("60CD26850000000000000000000000000000000000000000000000000000000000000000")
 
@@ -129,17 +124,27 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 		data[35] = byte(i)
 		if bc != nil {
 			header := bc.GetHeaderByHash(bhash)
-			statedb, err := state.New(header.Root, state.NewDatabase(db), nil)
+			statedb, err := state.New(header.Root, bc.StateCache(), nil)
 
 			if err == nil {
 				from := statedb.GetOrNewStateObject(bankAddr)
 				from.SetBalance(math.MaxBig256)
 
-				msg := callmsg{types.NewMessage(from.Address(), &testContractAddr, 0, new(big.Int), 100000, new(big.Int), data, nil, false)}
+				msg := &core.Message{
+					From:              from.Address(),
+					To:                &testContractAddr,
+					Value:             new(big.Int),
+					GasLimit:          100000,
+					GasPrice:          big.NewInt(params.InitialBaseFee),
+					GasFeeCap:         big.NewInt(params.InitialBaseFee),
+					GasTipCap:         new(big.Int),
+					Data:              data,
+					SkipAccountChecks: true,
+				}
 
 				context := core.NewEVMBlockContext(header, bc, nil)
 				txContext := core.NewEVMTxContext(msg)
-				vmenv := vm.NewEVM(context, txContext, statedb, config, vm.Config{})
+				vmenv := vm.NewEVM(context, txContext, statedb, config, vm.Config{NoBaseFee: true})
 
 				//vmenv := core.NewEnv(statedb, config, bc, msg, header, vm.Config{})
 				gp := new(core.GasPool).AddGas(math.MaxUint64)
@@ -150,10 +155,20 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 			header := lc.GetHeaderByHash(bhash)
 			state := light.NewState(ctx, header, lc.Odr())
 			state.SetBalance(bankAddr, math.MaxBig256)
-			msg := callmsg{types.NewMessage(bankAddr, &testContractAddr, 0, new(big.Int), 100000, new(big.Int), data, nil, false)}
+			msg := &core.Message{
+				From:              bankAddr,
+				To:                &testContractAddr,
+				Value:             new(big.Int),
+				GasLimit:          100000,
+				GasPrice:          big.NewInt(params.InitialBaseFee),
+				GasFeeCap:         big.NewInt(params.InitialBaseFee),
+				GasTipCap:         new(big.Int),
+				Data:              data,
+				SkipAccountChecks: true,
+			}
 			context := core.NewEVMBlockContext(header, lc, nil)
 			txContext := core.NewEVMTxContext(msg)
-			vmenv := vm.NewEVM(context, txContext, state, config, vm.Config{})
+			vmenv := vm.NewEVM(context, txContext, state, config, vm.Config{NoBaseFee: true})
 			gp := new(core.GasPool).AddGas(math.MaxUint64)
 			result, _ := core.ApplyMessage(vmenv, msg, gp)
 			if state.Error() == nil {
@@ -280,7 +295,7 @@ func testGetTxStatusFromUnindexedPeers(t *testing.T, protocol int) {
 		blockHashes  = make(map[common.Hash]common.Hash)        // Transaction hash to block hash mappings
 		intraIndex   = make(map[common.Hash]uint64)             // Transaction intra-index in block
 	)
-	for number := uint64(1); number < server.backend.Blockchain().CurrentBlock().NumberU64(); number++ {
+	for number := uint64(1); number < server.backend.Blockchain().CurrentBlock().Number.Uint64(); number++ {
 		block := server.backend.Blockchain().GetBlockByNumber(number)
 		if block == nil {
 			t.Fatalf("Failed to retrieve block %d", number)
@@ -294,7 +309,7 @@ func testGetTxStatusFromUnindexedPeers(t *testing.T, protocol int) {
 			if testHash == (common.Hash{}) {
 				testHash = tx.Hash()
 				testStatus = light.TxStatus{
-					Status: core.TxStatusIncluded,
+					Status: txpool.TxStatusIncluded,
 					Lookup: &rawdb.LegacyTxLookupEntry{
 						BlockHash:  block.Hash(),
 						BlockIndex: block.NumberU64(),
@@ -327,7 +342,7 @@ func testGetTxStatusFromUnindexedPeers(t *testing.T, protocol int) {
 			if txLookup != txIndexUnlimited && (txLookup == txIndexDisabled || number < min) {
 				continue // Filter out unindexed transactions
 			}
-			stats[i].Status = core.TxStatusIncluded
+			stats[i].Status = txpool.TxStatusIncluded
 			stats[i].Lookup = &rawdb.LegacyTxLookupEntry{
 				BlockHash:  blockHashes[hash],
 				BlockIndex: number,
@@ -392,18 +407,16 @@ func testGetTxStatusFromUnindexedPeers(t *testing.T, protocol int) {
 	for _, testspec := range testspecs {
 		// Create a bunch of server peers with different tx history
 		var (
-			serverPeers []*testPeer
-			closeFns    []func()
+			closeFns []func()
 		)
 		for i := 0; i < testspec.peers; i++ {
 			peer, closePeer, _ := client.newRawPeer(t, fmt.Sprintf("server-%d", i), protocol, testspec.txLookups[i])
-			serverPeers = append(serverPeers, peer)
 			closeFns = append(closeFns, closePeer)
 
 			// Create a one-time routine for serving message
-			go func(i int, peer *testPeer) {
-				serveMsg(peer, testspec.txLookups[i])
-			}(i, peer)
+			go func(i int, peer *testPeer, lookup uint64) {
+				serveMsg(peer, lookup)
+			}(i, peer, testspec.txLookups[i])
 		}
 
 		// Send out the GetTxStatus requests, compare the result with

@@ -1,53 +1,51 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/accounts/keystore"
 	"github.com/popcateum/go-popcateum/cmd/utils"
 	"github.com/popcateum/go-popcateum/crypto"
 	"github.com/popcateum/go-popcateum/log"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
 var (
-	walletCommand = cli.Command{
+	walletCommand = &cli.Command{
 		Name:      "wallet",
-		Usage:     "Manage Popcateum presale wallets",
+		Usage:     "Manage Ethereum presale wallets",
 		ArgsUsage: "",
-		Category:  "ACCOUNT COMMANDS",
 		Description: `
-    gpop wallet import /path/to/my/presale.wallet
+    geth wallet import /path/to/my/presale.wallet
 
-will prompt for your password and imports your popcat presale account.
+will prompt for your password and imports your ether presale account.
 It can be used non-interactively with the --password option taking a
 passwordfile as argument containing the wallet password in plaintext.`,
-		Subcommands: []cli.Command{
+		Subcommands: []*cli.Command{
 			{
 
 				Name:      "import",
-				Usage:     "Import Popcateum presale wallet",
+				Usage:     "Import Ethereum presale wallet",
 				ArgsUsage: "<keyFile>",
-				Action:    utils.MigrateFlags(importWallet),
-				Category:  "ACCOUNT COMMANDS",
+				Action:    importWallet,
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.KeyStoreDirFlag,
@@ -55,19 +53,18 @@ passwordfile as argument containing the wallet password in plaintext.`,
 					utils.LightKDFFlag,
 				},
 				Description: `
-	gpop wallet [options] /path/to/my/presale.wallet
+	geth wallet [options] /path/to/my/presale.wallet
 
-will prompt for your password and imports your popcat presale account.
+will prompt for your password and imports your ether presale account.
 It can be used non-interactively with the --password option taking a
 passwordfile as argument containing the wallet password in plaintext.`,
 			},
 		},
 	}
 
-	accountCommand = cli.Command{
-		Name:     "account",
-		Usage:    "Manage accounts",
-		Category: "ACCOUNT COMMANDS",
+	accountCommand = &cli.Command{
+		Name:  "account",
+		Usage: "Manage accounts",
 		Description: `
 
 Manage accounts, list all existing accounts, import a private key into a new
@@ -85,14 +82,14 @@ Note that exporting your key in unencrypted format is NOT supported.
 
 Keys are stored under <DATADIR>/keystore.
 It is safe to transfer the entire directory or the individual keys therein
-between popcateum nodes by simply copying.
+between ethereum nodes by simply copying.
 
 Make sure you backup your keys regularly.`,
-		Subcommands: []cli.Command{
+		Subcommands: []*cli.Command{
 			{
 				Name:   "list",
 				Usage:  "Print summary of existing accounts",
-				Action: utils.MigrateFlags(accountList),
+				Action: accountList,
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.KeyStoreDirFlag,
@@ -103,7 +100,7 @@ Print a short summary of all accounts`,
 			{
 				Name:   "new",
 				Usage:  "Create a new account",
-				Action: utils.MigrateFlags(accountCreate),
+				Action: accountCreate,
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.KeyStoreDirFlag,
@@ -111,7 +108,7 @@ Print a short summary of all accounts`,
 					utils.LightKDFFlag,
 				},
 				Description: `
-    gpop account new
+    geth account new
 
 Creates a new account and prints the address.
 
@@ -128,7 +125,7 @@ password to file or expose in any other way.
 			{
 				Name:      "update",
 				Usage:     "Update an existing account",
-				Action:    utils.MigrateFlags(accountUpdate),
+				Action:    accountUpdate,
 				ArgsUsage: "<address>",
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
@@ -136,7 +133,7 @@ password to file or expose in any other way.
 					utils.LightKDFFlag,
 				},
 				Description: `
-    gpop account update <address>
+    geth account update <address>
 
 Update an existing account.
 
@@ -148,7 +145,7 @@ format to the newest format or change the password for an account.
 
 For non-interactive use the password can be specified with the --password flag:
 
-    gpop account update [options] <address>
+    geth account update [options] <address>
 
 Since only one password can be given, only format update can be performed,
 changing your password is only possible interactively.
@@ -157,7 +154,7 @@ changing your password is only possible interactively.
 			{
 				Name:   "import",
 				Usage:  "Import a private key into a new account",
-				Action: utils.MigrateFlags(accountImport),
+				Action: accountImport,
 				Flags: []cli.Flag{
 					utils.DataDirFlag,
 					utils.KeyStoreDirFlag,
@@ -166,7 +163,7 @@ changing your password is only possible interactively.
 				},
 				ArgsUsage: "<keyFile>",
 				Description: `
-    gpop account import <keyfile>
+    geth account import <keyfile>
 
 Imports an unencrypted private key from <keyfile> and creates a new account.
 Prints the address.
@@ -179,10 +176,10 @@ You must remember this password to unlock your account in the future.
 
 For non-interactive use the password can be specified with the -password flag:
 
-    gpop account import [options] <keyfile>
+    geth account import [options] <keyfile>
 
 Note:
-As you can directly copy your encrypted accounts to another popcateum instance,
+As you can directly copy your encrypted accounts to another ethereum instance,
 this import mechanism is not needed when you transfer an account between
 nodes.
 `,
@@ -239,14 +236,15 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 	}
 	fmt.Println("Testing your password against all of them...")
 	var match *accounts.Account
-	for _, a := range err.Matches {
-		if err := ks.Unlock(a, auth); err == nil {
-			match = &a
+	for i, a := range err.Matches {
+		if e := ks.Unlock(a, auth); e == nil {
+			match = &err.Matches[i]
 			break
 		}
 	}
 	if match == nil {
 		utils.Fatalf("None of the listed files could be unlocked.")
+		return accounts.Account{}
 	}
 	fmt.Printf("Your password unlocked %s\n", match.URL)
 	fmt.Println("In order to avoid this warning, you need to remove the following duplicate key files:")
@@ -260,18 +258,23 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 
 // accountCreate creates a new account into the keystore defined by the CLI flags.
 func accountCreate(ctx *cli.Context) error {
-	cfg := gpopConfig{Node: defaultNodeConfig()}
+	cfg := gethConfig{Node: defaultNodeConfig()}
 	// Load config file.
-	if file := ctx.GlobalString(configFileFlag.Name); file != "" {
+	if file := ctx.String(configFileFlag.Name); file != "" {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
 	}
 	utils.SetNodeConfig(ctx, &cfg.Node)
-	scryptN, scryptP, keydir, err := cfg.Node.AccountConfig()
-
+	keydir, err := cfg.Node.KeyDirConfig()
 	if err != nil {
 		utils.Fatalf("Failed to read configuration: %v", err)
+	}
+	scryptN := keystore.StandardScryptN
+	scryptP := keystore.StandardScryptP
+	if cfg.Node.UseLightweightKDF {
+		scryptN = keystore.LightScryptN
+		scryptP = keystore.LightScryptP
 	}
 
 	password := utils.GetPassPhraseWithList("Your new account is locked with a password. Please give a password. Do not forget this password.", true, 0, utils.MakePasswordList(ctx))
@@ -294,13 +297,17 @@ func accountCreate(ctx *cli.Context) error {
 // accountUpdate transitions an account from a previous format to the current
 // one, also providing the possibility to change the pass-phrase.
 func accountUpdate(ctx *cli.Context) error {
-	if len(ctx.Args()) == 0 {
+	if ctx.Args().Len() == 0 {
 		utils.Fatalf("No accounts specified to update")
 	}
 	stack, _ := makeConfigNode(ctx)
-	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	backends := stack.AccountManager().Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		utils.Fatalf("Keystore is not available")
+	}
+	ks := backends[0].(*keystore.KeyStore)
 
-	for _, addr := range ctx.Args() {
+	for _, addr := range ctx.Args().Slice() {
 		account, oldPassword := unlockAccount(ks, addr, 0, nil)
 		newPassword := utils.GetPassPhraseWithList("Please give a new password. Do not forget this password.", true, 0, nil)
 		if err := ks.Update(account, oldPassword, newPassword); err != nil {
@@ -311,11 +318,11 @@ func accountUpdate(ctx *cli.Context) error {
 }
 
 func importWallet(ctx *cli.Context) error {
-	keyfile := ctx.Args().First()
-	if len(keyfile) == 0 {
-		utils.Fatalf("keyfile must be given as argument")
+	if ctx.Args().Len() != 1 {
+		utils.Fatalf("keyfile must be given as the only argument")
 	}
-	keyJSON, err := ioutil.ReadFile(keyfile)
+	keyfile := ctx.Args().First()
+	keyJSON, err := os.ReadFile(keyfile)
 	if err != nil {
 		utils.Fatalf("Could not read wallet file: %v", err)
 	}
@@ -323,7 +330,11 @@ func importWallet(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	passphrase := utils.GetPassPhraseWithList("", false, 0, utils.MakePasswordList(ctx))
 
-	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	backends := stack.AccountManager().Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		utils.Fatalf("Keystore is not available")
+	}
+	ks := backends[0].(*keystore.KeyStore)
 	acct, err := ks.ImportPreSaleKey(keyJSON, passphrase)
 	if err != nil {
 		utils.Fatalf("%v", err)
@@ -333,10 +344,10 @@ func importWallet(ctx *cli.Context) error {
 }
 
 func accountImport(ctx *cli.Context) error {
-	keyfile := ctx.Args().First()
-	if len(keyfile) == 0 {
-		utils.Fatalf("keyfile must be given as argument")
+	if ctx.Args().Len() != 1 {
+		utils.Fatalf("keyfile must be given as the only argument")
 	}
+	keyfile := ctx.Args().First()
 	key, err := crypto.LoadECDSA(keyfile)
 	if err != nil {
 		utils.Fatalf("Failed to load the private key: %v", err)
@@ -344,7 +355,11 @@ func accountImport(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	passphrase := utils.GetPassPhraseWithList("Your new account is locked with a password. Please give a password. Do not forget this password.", true, 0, utils.MakePasswordList(ctx))
 
-	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	backends := stack.AccountManager().Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		utils.Fatalf("Keystore is not available")
+	}
+	ks := backends[0].(*keystore.KeyStore)
 	acct, err := ks.ImportECDSA(key, passphrase)
 	if err != nil {
 		utils.Fatalf("Could not create the account: %v", err)

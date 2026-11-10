@@ -1,24 +1,23 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package node
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -32,11 +31,7 @@ import (
 // ones or automatically generated temporary ones.
 func TestDatadirCreation(t *testing.T) {
 	// Create a temporary data dir and check that it can be used by a node
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("failed to create manual data dir: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	node, err := New(&Config{DataDir: dir})
 	if err != nil {
@@ -58,19 +53,19 @@ func TestDatadirCreation(t *testing.T) {
 		t.Fatalf("freshly created datadir not accessible: %v", err)
 	}
 	// Verify that an impossible datadir fails creation
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatalf("failed to create temporary file: %v", err)
 	}
-	defer os.Remove(file.Name())
+	defer func() {
+		file.Close()
+		os.Remove(file.Name())
+	}()
 
 	dir = filepath.Join(file.Name(), "invalid/path")
-	node, err = New(&Config{DataDir: dir})
+	_, err = New(&Config{DataDir: dir})
 	if err == nil {
 		t.Fatalf("protocol stack created with an invalid datadir")
-		if err := node.Close(); err != nil {
-			t.Fatalf("failed to close node: %v", err)
-		}
 	}
 }
 
@@ -85,15 +80,15 @@ func TestIPCPathResolution(t *testing.T) {
 	}{
 		{"", "", false, ""},
 		{"data", "", false, ""},
-		{"", "gpop.ipc", false, filepath.Join(os.TempDir(), "gpop.ipc")},
-		{"data", "gpop.ipc", false, "data/gpop.ipc"},
-		{"data", "./gpop.ipc", false, "./gpop.ipc"},
-		{"data", "/gpop.ipc", false, "/gpop.ipc"},
+		{"", "geth.ipc", false, filepath.Join(os.TempDir(), "geth.ipc")},
+		{"data", "geth.ipc", false, "data/geth.ipc"},
+		{"data", "./geth.ipc", false, "./geth.ipc"},
+		{"data", "/geth.ipc", false, "/geth.ipc"},
 		{"", "", true, ``},
 		{"data", "", true, ``},
-		{"", "gpop.ipc", true, `\\.\pipe\gpop.ipc`},
-		{"data", "gpop.ipc", true, `\\.\pipe\gpop.ipc`},
-		{"data", `\\.\pipe\gpop.ipc`, true, `\\.\pipe\gpop.ipc`},
+		{"", "geth.ipc", true, `\\.\pipe\geth.ipc`},
+		{"data", "geth.ipc", true, `\\.\pipe\geth.ipc`},
+		{"data", `\\.\pipe\geth.ipc`, true, `\\.\pipe\geth.ipc`},
 	}
 	for i, test := range tests {
 		// Only run when platform/test match
@@ -109,11 +104,7 @@ func TestIPCPathResolution(t *testing.T) {
 // ephemeral.
 func TestNodeKeyPersistency(t *testing.T) {
 	// Create a temporary folder and make sure no key is present
-	dir, err := ioutil.TempDir("", "node-test")
-	if err != nil {
-		t.Fatalf("failed to create temporary data directory: %v", err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	keyfile := filepath.Join(dir, "unit-test", datadirPrivateKey)
 
@@ -124,7 +115,7 @@ func TestNodeKeyPersistency(t *testing.T) {
 	}
 	config := &Config{Name: "unit-test", DataDir: dir, P2P: p2p.Config{PrivateKey: key}}
 	config.NodeKey()
-	if _, err := os.Stat(filepath.Join(keyfile)); err == nil {
+	if _, err := os.Stat(keyfile); err == nil {
 		t.Fatalf("one-shot node key persisted to data directory")
 	}
 
@@ -137,7 +128,7 @@ func TestNodeKeyPersistency(t *testing.T) {
 	if _, err = crypto.LoadECDSA(keyfile); err != nil {
 		t.Fatalf("failed to load freshly persisted node key: %v", err)
 	}
-	blob1, err := ioutil.ReadFile(keyfile)
+	blob1, err := os.ReadFile(keyfile)
 	if err != nil {
 		t.Fatalf("failed to read freshly persisted node key: %v", err)
 	}
@@ -145,7 +136,7 @@ func TestNodeKeyPersistency(t *testing.T) {
 	// Configure a new node and ensure the previously persisted key is loaded
 	config = &Config{Name: "unit-test", DataDir: dir}
 	config.NodeKey()
-	blob2, err := ioutil.ReadFile(filepath.Join(keyfile))
+	blob2, err := os.ReadFile(keyfile)
 	if err != nil {
 		t.Fatalf("failed to read previously persisted node key: %v", err)
 	}

@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -166,7 +166,7 @@ func (p *peerCommons) String() string {
 // PeerInfo represents a short summary of the `eth` sub-protocol metadata known
 // about a connected peer.
 type PeerInfo struct {
-	Version    int      `json:"version"`    // Popcateum protocol version negotiated
+	Version    int      `json:"version"`    // Ethereum protocol version negotiated
 	Difficulty *big.Int `json:"difficulty"` // Total difficulty of the peer's blockchain
 	Head       string   `json:"head"`       // SHA3 hash of the peer's best owned block
 }
@@ -213,7 +213,7 @@ func (p *peerCommons) sendReceiveHandshake(sendList keyValueList) (keyValueList,
 	)
 	// Send out own handshake in a new thread
 	go func() {
-		errc <- p2p.Send(p.rw, StatusMsg, sendList)
+		errc <- p2p.Send(p.rw, StatusMsg, &sendList)
 	}()
 	go func() {
 		// In the mean time retrieve the remote status message
@@ -273,7 +273,7 @@ func (p *peerCommons) handshake(td *big.Int, head common.Hash, headNum uint64, g
 	send = send.add("genesisHash", genesis)
 
 	// If the protocol version is beyond les4, then pass the forkID
-	// as well. Check http://eips.popcateum.org/EIPS/eip-2124 for more
+	// as well. Check http://eips.ethereum.org/EIPS/eip-2124 for more
 	// spec detail.
 	if p.version >= lpv4 {
 		send = send.add("forkID", forkID)
@@ -421,7 +421,7 @@ func sendRequest(w p2p.MsgWriter, msgcode, reqID uint64, data interface{}) error
 		ReqID uint64
 		Data  interface{}
 	}
-	return p2p.Send(w, msgcode, req{reqID, data})
+	return p2p.Send(w, msgcode, &req{reqID, data})
 }
 
 func (p *serverPeer) sendRequest(msgcode, reqID uint64, data interface{}, amount int) error {
@@ -871,7 +871,7 @@ func (r *reply) send(bv uint64) error {
 		ReqID, BV uint64
 		Data      rlp.RawValue
 	}
-	return p2p.Send(r.w, r.msgcode, resp{r.reqID, bv, r.data})
+	return p2p.Send(r.w, r.msgcode, &resp{r.reqID, bv, r.data})
 }
 
 // size returns the RLP encoded size of the message data
@@ -995,40 +995,6 @@ func (p *clientPeer) sendLastAnnounce() {
 	}
 }
 
-// freezeClient temporarily puts the client in a frozen state which means all
-// unprocessed and subsequent requests are dropped. Unfreezing happens automatically
-// after a short time if the client's buffer value is at least in the slightly positive
-// region. The client is also notified about being frozen/unfrozen with a Stop/Resume
-// message.
-func (p *clientPeer) freezeClient() {
-	if p.version < lpv3 {
-		// if Stop/Resume is not supported then just drop the peer after setting
-		// its frozen status permanently
-		atomic.StoreUint32(&p.frozen, 1)
-		p.Peer.Disconnect(p2p.DiscUselessPeer)
-		return
-	}
-	if atomic.SwapUint32(&p.frozen, 1) == 0 {
-		go func() {
-			p.sendStop()
-			time.Sleep(freezeTimeBase + time.Duration(rand.Int63n(int64(freezeTimeRandom))))
-			for {
-				bufValue, bufLimit := p.fcClient.BufferStatus()
-				if bufLimit == 0 {
-					return
-				}
-				if bufValue <= bufLimit/8 {
-					time.Sleep(freezeCheckPeriod)
-				} else {
-					atomic.StoreUint32(&p.frozen, 0)
-					p.sendResume(bufValue)
-					break
-				}
-			}
-		}()
-	}
-}
-
 // Handshake executes the les protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
 func (p *clientPeer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis common.Hash, forkID forkid.ID, forkFilter forkid.Filter, server *LesServer) error {
@@ -1056,7 +1022,7 @@ func (p *clientPeer) Handshake(td *big.Int, head common.Hash, headNum uint64, ge
 			*lists = (*lists).add("serveChainSince", uint64(0))
 			*lists = (*lists).add("serveStateSince", uint64(0))
 
-			// If local popcateum node is running in archive mode, advertise ourselves we have
+			// If local ethereum node is running in archive mode, advertise ourselves we have
 			// all version state data. Otherwise only recent state is available.
 			stateRecent := uint64(core.TriesInMemory - blockSafetyMargin)
 			if server.archiveMode {
@@ -1129,7 +1095,7 @@ type serverPeerSubscriber interface {
 }
 
 // serverPeerSet represents the set of active server peers currently
-// participating in the Light Popcateum sub-protocol.
+// participating in the Light Ethereum sub-protocol.
 type serverPeerSet struct {
 	peers map[string]*serverPeer
 	// subscribers is a batch of subscribers and peerset will notify
@@ -1154,19 +1120,6 @@ func (ps *serverPeerSet) subscribe(sub serverPeerSubscriber) {
 	ps.subscribers = append(ps.subscribers, sub)
 	for _, p := range ps.peers {
 		sub.registerPeer(p)
-	}
-}
-
-// unSubscribe removes the specified service from the subscriber pool.
-func (ps *serverPeerSet) unSubscribe(sub serverPeerSubscriber) {
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
-
-	for i, s := range ps.subscribers {
-		if s == sub {
-			ps.subscribers = append(ps.subscribers[:i], ps.subscribers[i+1:]...)
-			return
-		}
 	}
 }
 
@@ -1236,25 +1189,6 @@ func (ps *serverPeerSet) len() int {
 	return len(ps.peers)
 }
 
-// bestPeer retrieves the known peer with the currently highest total difficulty.
-// If the peerset is "client peer set", then nothing meaningful will return. The
-// reason is client peer never send back their latest status to server.
-func (ps *serverPeerSet) bestPeer() *serverPeer {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
-
-	var (
-		bestPeer *serverPeer
-		bestTd   *big.Int
-	)
-	for _, p := range ps.peers {
-		if td := p.Td(); bestTd == nil || td.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = p, td
-		}
-	}
-	return bestPeer
-}
-
 // allServerPeers returns all server peers in a list.
 func (ps *serverPeerSet) allPeers() []*serverPeer {
 	ps.lock.RLock()
@@ -1280,7 +1214,7 @@ func (ps *serverPeerSet) close() {
 }
 
 // clientPeerSet represents the set of active client peers currently
-// participating in the Light Popcateum sub-protocol.
+// participating in the Light Ethereum sub-protocol.
 type clientPeerSet struct {
 	peers  map[enode.ID]*clientPeer
 	lock   sync.RWMutex
@@ -1346,14 +1280,6 @@ func (ps *clientPeerSet) peer(id enode.ID) *clientPeer {
 	defer ps.lock.RUnlock()
 
 	return ps.peers[id]
-}
-
-// len returns if the current number of peers in the set.
-func (ps *clientPeerSet) len() int {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
-
-	return len(ps.peers)
 }
 
 // setSignerKey sets the signer key for signed announcements. Should be called before

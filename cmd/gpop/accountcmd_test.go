@@ -1,23 +1,23 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -33,7 +33,7 @@ import (
 // are copied into a temporary keystore directory.
 
 func tmpDatadirWithKeystore(t *testing.T) string {
-	datadir := tmpdir(t)
+	datadir := t.TempDir()
 	keystore := filepath.Join(datadir, "keystore")
 	source := filepath.Join("..", "..", "accounts", "keystore", "testdata", "keystore")
 	if err := cp.CopyAll(keystore, source); err != nil {
@@ -43,33 +43,40 @@ func tmpDatadirWithKeystore(t *testing.T) string {
 }
 
 func TestAccountListEmpty(t *testing.T) {
-	gpop := runGpop(t, "account", "list")
-	gpop.ExpectExit()
+	geth := runGeth(t, "account", "list")
+	geth.ExpectExit()
 }
 
 func TestAccountList(t *testing.T) {
 	datadir := tmpDatadirWithKeystore(t)
-	gpop := runGpop(t, "account", "list", "--datadir", datadir)
-	defer gpop.ExpectExit()
-	if runtime.GOOS == "windows" {
-		gpop.Expect(`
-Account #0: {7ef5a6135f1fd6a02593eedc869c6d41d934aef8} keystore://{{.Datadir}}\keystore\UTC--2016-03-22T12-57-55.920751759Z--7ef5a6135f1fd6a02593eedc869c6d41d934aef8
-Account #1: {f466859ead1932d743d622cb74fc058882e8648a} keystore://{{.Datadir}}\keystore\aaa
-Account #2: {289d485d9771714cce91d3393d764e1311907acc} keystore://{{.Datadir}}\keystore\zzz
-`)
-	} else {
-		gpop.Expect(`
+	var want = `
 Account #0: {7ef5a6135f1fd6a02593eedc869c6d41d934aef8} keystore://{{.Datadir}}/keystore/UTC--2016-03-22T12-57-55.920751759Z--7ef5a6135f1fd6a02593eedc869c6d41d934aef8
 Account #1: {f466859ead1932d743d622cb74fc058882e8648a} keystore://{{.Datadir}}/keystore/aaa
 Account #2: {289d485d9771714cce91d3393d764e1311907acc} keystore://{{.Datadir}}/keystore/zzz
-`)
+`
+	if runtime.GOOS == "windows" {
+		want = `
+Account #0: {7ef5a6135f1fd6a02593eedc869c6d41d934aef8} keystore://{{.Datadir}}\keystore\UTC--2016-03-22T12-57-55.920751759Z--7ef5a6135f1fd6a02593eedc869c6d41d934aef8
+Account #1: {f466859ead1932d743d622cb74fc058882e8648a} keystore://{{.Datadir}}\keystore\aaa
+Account #2: {289d485d9771714cce91d3393d764e1311907acc} keystore://{{.Datadir}}\keystore\zzz
+`
+	}
+	{
+		geth := runGeth(t, "account", "list", "--datadir", datadir)
+		geth.Expect(want)
+		geth.ExpectExit()
+	}
+	{
+		geth := runGeth(t, "--datadir", datadir, "account", "list")
+		geth.Expect(want)
+		geth.ExpectExit()
 	}
 }
 
 func TestAccountNew(t *testing.T) {
-	gpop := runGpop(t, "account", "new", "--lightkdf")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	geth := runGeth(t, "account", "new", "--lightkdf")
+	defer geth.ExpectExit()
+	geth.Expect(`
 Your new account is locked with a password. Please give a password. Do not forget this password.
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foobar"}}
@@ -77,7 +84,7 @@ Repeat password: {{.InputLine "foobar"}}
 
 Your new key was generated
 `)
-	gpop.ExpectRegexp(`
+	geth.ExpectRegexp(`
 Public address of the key:   0x[0-9a-fA-F]{40}
 Path of the secret key file: .*UTC--.+--[0-9a-f]{40}
 
@@ -110,25 +117,39 @@ func TestAccountImport(t *testing.T) {
 	}
 }
 
+func TestAccountHelp(t *testing.T) {
+	geth := runGeth(t, "account", "-h")
+	geth.WaitExit()
+	if have, want := geth.ExitStatus(), 0; have != want {
+		t.Errorf("exit error, have %d want %d", have, want)
+	}
+
+	geth = runGeth(t, "account", "import", "-h")
+	geth.WaitExit()
+	if have, want := geth.ExitStatus(), 0; have != want {
+		t.Errorf("exit error, have %d want %d", have, want)
+	}
+}
+
 func importAccountWithExpect(t *testing.T, key string, expected string) {
-	dir := tmpdir(t)
+	dir := t.TempDir()
 	keyfile := filepath.Join(dir, "key.prv")
-	if err := ioutil.WriteFile(keyfile, []byte(key), 0600); err != nil {
+	if err := os.WriteFile(keyfile, []byte(key), 0600); err != nil {
 		t.Error(err)
 	}
 	passwordFile := filepath.Join(dir, "password.txt")
-	if err := ioutil.WriteFile(passwordFile, []byte("foobar"), 0600); err != nil {
+	if err := os.WriteFile(passwordFile, []byte("foobar"), 0600); err != nil {
 		t.Error(err)
 	}
-	gpop := runGpop(t, "account", "import", keyfile, "-password", passwordFile)
-	defer gpop.ExpectExit()
-	gpop.Expect(expected)
+	geth := runGeth(t, "--lightkdf", "account", "import", "-password", passwordFile, keyfile)
+	defer geth.ExpectExit()
+	geth.Expect(expected)
 }
 
 func TestAccountNewBadRepeat(t *testing.T) {
-	gpop := runGpop(t, "account", "new", "--lightkdf")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	geth := runGeth(t, "account", "new", "--lightkdf")
+	defer geth.ExpectExit()
+	geth.Expect(`
 Your new account is locked with a password. Please give a password. Do not forget this password.
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "something"}}
@@ -139,11 +160,11 @@ Fatal: Passwords do not match
 
 func TestAccountUpdate(t *testing.T) {
 	datadir := tmpDatadirWithKeystore(t)
-	gpop := runGpop(t, "account", "update",
+	geth := runGeth(t, "account", "update",
 		"--datadir", datadir, "--lightkdf",
 		"f466859ead1932d743d622cb74fc058882e8648a")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	defer geth.ExpectExit()
+	geth.Expect(`
 Unlocking account f466859ead1932d743d622cb74fc058882e8648a | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foobar"}}
@@ -154,24 +175,24 @@ Repeat password: {{.InputLine "foobar2"}}
 }
 
 func TestWalletImport(t *testing.T) {
-	gpop := runGpop(t, "wallet", "import", "--lightkdf", "testdata/guswallet.json")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	geth := runGeth(t, "wallet", "import", "--lightkdf", "testdata/guswallet.json")
+	defer geth.ExpectExit()
+	geth.Expect(`
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foo"}}
 Address: {d4584b5f6229b7be90727b0fc8c6b91bb427821f}
 `)
 
-	files, err := ioutil.ReadDir(filepath.Join(gpop.Datadir, "keystore"))
+	files, err := os.ReadDir(filepath.Join(geth.Datadir, "keystore"))
 	if len(files) != 1 {
 		t.Errorf("expected one key file in keystore directory, found %d files (error: %v)", len(files), err)
 	}
 }
 
 func TestWalletImportBadPassword(t *testing.T) {
-	gpop := runGpop(t, "wallet", "import", "--lightkdf", "testdata/guswallet.json")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	geth := runGeth(t, "wallet", "import", "--lightkdf", "testdata/guswallet.json")
+	defer geth.ExpectExit()
+	geth.Expect(`
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "wrong"}}
 Fatal: could not decrypt key with given password
@@ -179,32 +200,33 @@ Fatal: could not decrypt key with given password
 }
 
 func TestUnlockFlag(t *testing.T) {
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
-		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "js", "testdata/empty.js")
-	gpop.Expect(`
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "console", "--exec", "loadScript('testdata/empty.js')")
+	geth.Expect(`
 Unlocking account f466859ead1932d743d622cb74fc058882e8648a | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foobar"}}
+undefined
 `)
-	gpop.ExpectExit()
+	geth.ExpectExit()
 
 	wantMessages := []string{
 		"Unlocked account",
 		"=0xf466859eAD1932D743d622CB74FC058882E8648A",
 	}
 	for _, m := range wantMessages {
-		if !strings.Contains(gpop.StderrText(), m) {
+		if !strings.Contains(geth.StderrText(), m) {
 			t.Errorf("stderr text does not contain %q", m)
 		}
 	}
 }
 
 func TestUnlockFlagWrongPassword(t *testing.T) {
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
-		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "js", "testdata/empty.js")
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "console", "--exec", "loadScript('testdata/empty.js')")
 
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	defer geth.ExpectExit()
+	geth.Expect(`
 Unlocking account f466859ead1932d743d622cb74fc058882e8648a | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "wrong1"}}
@@ -218,17 +240,18 @@ Fatal: Failed to unlock account f466859ead1932d743d622cb74fc058882e8648a (could 
 
 // https://github.com/popcateum/go-popcateum/issues/1785
 func TestUnlockFlagMultiIndex(t *testing.T) {
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
-		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--unlock", "0,2", "js", "testdata/empty.js")
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--unlock", "0,2", "console", "--exec", "loadScript('testdata/empty.js')")
 
-	gpop.Expect(`
+	geth.Expect(`
 Unlocking account 0 | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foobar"}}
 Unlocking account 2 | Attempt 1/3
 Password: {{.InputLine "foobar"}}
+undefined
 `)
-	gpop.ExpectExit()
+	geth.ExpectExit()
 
 	wantMessages := []string{
 		"Unlocked account",
@@ -236,17 +259,20 @@ Password: {{.InputLine "foobar"}}
 		"=0x289d485D9771714CCe91D3393D764E1311907ACc",
 	}
 	for _, m := range wantMessages {
-		if !strings.Contains(gpop.StderrText(), m) {
+		if !strings.Contains(geth.StderrText(), m) {
 			t.Errorf("stderr text does not contain %q", m)
 		}
 	}
 }
 
 func TestUnlockFlagPasswordFile(t *testing.T) {
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
-		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--password", "testdata/passwords.txt", "--unlock", "0,2", "js", "testdata/empty.js")
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--password", "testdata/passwords.txt", "--unlock", "0,2", "console", "--exec", "loadScript('testdata/empty.js')")
 
-	gpop.ExpectExit()
+	geth.Expect(`
+undefined
+`)
+	geth.ExpectExit()
 
 	wantMessages := []string{
 		"Unlocked account",
@@ -254,36 +280,36 @@ func TestUnlockFlagPasswordFile(t *testing.T) {
 		"=0x289d485D9771714CCe91D3393D764E1311907ACc",
 	}
 	for _, m := range wantMessages {
-		if !strings.Contains(gpop.StderrText(), m) {
+		if !strings.Contains(geth.StderrText(), m) {
 			t.Errorf("stderr text does not contain %q", m)
 		}
 	}
 }
 
 func TestUnlockFlagPasswordFileWrongPassword(t *testing.T) {
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
 		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--password",
 		"testdata/wrong-passwords.txt", "--unlock", "0,2")
-	defer gpop.ExpectExit()
-	gpop.Expect(`
+	defer geth.ExpectExit()
+	geth.Expect(`
 Fatal: Failed to unlock account 0 (could not decrypt key with given password)
 `)
 }
 
 func TestUnlockFlagAmbiguous(t *testing.T) {
 	store := filepath.Join("..", "..", "accounts", "keystore", "testdata", "dupes")
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
 		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--keystore",
 		store, "--unlock", "f466859ead1932d743d622cb74fc058882e8648a",
-		"js", "testdata/empty.js")
-	defer gpop.ExpectExit()
+		"console", "--exec", "loadScript('testdata/empty.js')")
+	defer geth.ExpectExit()
 
 	// Helper for the expect template, returns absolute keystore path.
-	gpop.SetTemplateFunc("keypath", func(file string) string {
+	geth.SetTemplateFunc("keypath", func(file string) string {
 		abs, _ := filepath.Abs(filepath.Join(store, file))
 		return abs
 	})
-	gpop.Expect(`
+	geth.Expect(`
 Unlocking account f466859ead1932d743d622cb74fc058882e8648a | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "foobar"}}
@@ -294,15 +320,16 @@ Testing your password against all of them...
 Your password unlocked keystore://{{keypath "1"}}
 In order to avoid this warning, you need to remove the following duplicate key files:
    keystore://{{keypath "2"}}
+undefined
 `)
-	gpop.ExpectExit()
+	geth.ExpectExit()
 
 	wantMessages := []string{
 		"Unlocked account",
 		"=0xf466859eAD1932D743d622CB74FC058882E8648A",
 	}
 	for _, m := range wantMessages {
-		if !strings.Contains(gpop.StderrText(), m) {
+		if !strings.Contains(geth.StderrText(), m) {
 			t.Errorf("stderr text does not contain %q", m)
 		}
 	}
@@ -310,18 +337,18 @@ In order to avoid this warning, you need to remove the following duplicate key f
 
 func TestUnlockFlagAmbiguousWrongPassword(t *testing.T) {
 	store := filepath.Join("..", "..", "accounts", "keystore", "testdata", "dupes")
-	gpop := runMinimalGpop(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
+	geth := runMinimalGeth(t, "--port", "0", "--ipcdisable", "--datadir", tmpDatadirWithKeystore(t),
 		"--unlock", "f466859ead1932d743d622cb74fc058882e8648a", "--keystore",
 		store, "--unlock", "f466859ead1932d743d622cb74fc058882e8648a")
 
-	defer gpop.ExpectExit()
+	defer geth.ExpectExit()
 
 	// Helper for the expect template, returns absolute keystore path.
-	gpop.SetTemplateFunc("keypath", func(file string) string {
+	geth.SetTemplateFunc("keypath", func(file string) string {
 		abs, _ := filepath.Abs(filepath.Join(store, file))
 		return abs
 	})
-	gpop.Expect(`
+	geth.Expect(`
 Unlocking account f466859ead1932d743d622cb74fc058882e8648a | Attempt 1/3
 !! Unsupported terminal, password will be echoed.
 Password: {{.InputLine "wrong"}}
@@ -331,5 +358,5 @@ Multiple key files exist for address f466859ead1932d743d622cb74fc058882e8648a:
 Testing your password against all of them...
 Fatal: None of the listed files could be unlocked.
 `)
-	gpop.ExpectExit()
+	geth.ExpectExit()
 }

@@ -1,18 +1,18 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package p2p
 
@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sync/atomic"
 	"time"
 
@@ -66,7 +65,7 @@ func (msg Msg) String() string {
 
 // Discard reads any remaining payload data into a black hole.
 func (msg Msg) Discard() error {
-	_, err := io.Copy(ioutil.Discard, msg.Payload)
+	_, err := io.Copy(io.Discard, msg.Payload)
 	return err
 }
 
@@ -108,12 +107,11 @@ func Send(w MsgWriter, msgcode uint64, data interface{}) error {
 // SendItems writes an RLP with the given code and data elements.
 // For a call such as:
 //
-//    SendItems(w, code, e1, e2, e3)
+//	SendItems(w, code, e1, e2, e3)
 //
 // the message payload will be an RLP list containing the items:
 //
-//    [e1, e2, e3]
-//
+//	[e1, e2, e3]
 func SendItems(w MsgWriter, msgcode uint64, elems ...interface{}) error {
 	return Send(w, msgcode, elems)
 }
@@ -245,7 +243,7 @@ func ExpectMsg(r MsgReader, code uint64, content interface{}) error {
 	if int(msg.Size) != len(contentEnc) {
 		return fmt.Errorf("message size mismatch: got %d, want %d", msg.Size, len(contentEnc))
 	}
-	actualContent, err := ioutil.ReadAll(msg.Payload)
+	actualContent, err := io.ReadAll(msg.Payload)
 	if err != nil {
 		return err
 	}

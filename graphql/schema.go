@@ -1,25 +1,25 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package graphql
 
 const schema string = `
     # Bytes32 is a 32 byte binary string, represented as 0x-prefixed hexadecimal.
     scalar Bytes32
-    # Address is a 20 byte Popcateum address, represented as 0x-prefixed hexadecimal.
+    # Address is a 20 byte Ethereum address, represented as 0x-prefixed hexadecimal.
     scalar Address
     # Bytes is an arbitrary length binary string, represented as 0x-prefixed hexadecimal.
     # An empty byte string is represented as '0x'. Byte strings must have an even number of hexadecimal nybbles.
@@ -36,7 +36,7 @@ const schema string = `
         mutation: Mutation
     }
 
-    # Account is an Popcateum account at a particular block.
+    # Account is an Ethereum account at a particular block.
     type Account {
         # Address is the address owning the account.
         address: Address!
@@ -54,7 +54,7 @@ const schema string = `
         storage(slot: Bytes32!): Bytes32!
     }
 
-    # Log is an Popcateum event log.
+    # Log is an Ethereum event log.
     type Log {
         # Index is the index of this log in the block.
         index: Int!
@@ -69,13 +69,13 @@ const schema string = `
         transaction: Transaction!
     }
 
-    #EIP-2718 
+    #EIP-2718
     type AccessTuple{
         address: Address!
-        storageKeys : [Bytes32!]
+        storageKeys : [Bytes32!]!
     }
 
-    # Transaction is an Popcateum transaction.
+    # Transaction is an Ethereum transaction.
     type Transaction {
         # Hash is the hash of this transaction.
         hash: Bytes32!
@@ -94,6 +94,12 @@ const schema string = `
         value: BigInt!
         # GasPrice is the price offered to miners for gas, in wei per unit.
         gasPrice: BigInt!
+        # MaxFeePerGas is the maximum fee per gas offered to include a transaction, in wei.
+        maxFeePerGas: BigInt
+        # MaxPriorityFeePerGas is the maximum miner tip per gas offered to include a transaction, in wei.
+        maxPriorityFeePerGas: BigInt
+        # EffectiveTip is the actual amount of reward going to miner after considering the max fee cap.
+        effectiveTip: BigInt
         # Gas is the maximum amount of gas this transaction can consume.
         gas: Long!
         # InputData is the data supplied to the target of the transaction.
@@ -114,6 +120,13 @@ const schema string = `
         # this transaction. If the transaction has not yet been mined, this field
         # will be null.
         cumulativeGasUsed: Long
+        # EffectiveGasPrice is actual value per gas deducted from the sender's
+        # account. Before EIP-1559, this is equal to the transaction's gas price.
+        # After EIP-1559, it is baseFeePerGas + min(maxFeePerGas - baseFeePerGas,
+        # maxPriorityFeePerGas). Legacy transactions and EIP-2930 transactions are
+        # coerced into the EIP-1559 format by setting both maxFeePerGas and
+        # maxPriorityFeePerGas as the transaction's gas price.
+        effectiveGasPrice: BigInt
         # CreatedContract is the account that was created by a contract creation
         # transaction. If the transaction was not a contract creation transaction,
         # or it has not yet been mined, this field will be null.
@@ -124,9 +137,16 @@ const schema string = `
         r: BigInt!
         s: BigInt!
         v: BigInt!
-        #Envelope transaction support
+        # Envelope transaction support
         type: Int
         accessList: [AccessTuple!]
+        # Raw is the canonical encoding of the transaction.
+        # For legacy transactions, it returns the RLP encoding.
+        # For EIP-2718 typed transactions, it returns the type and payload.
+        raw: Bytes!
+        # RawReceipt is the canonical encoding of the receipt. For post EIP-2718 typed transactions
+        # this is equivalent to TxType || ReceiptEncoding.
+        rawReceipt: Bytes!
     }
 
     # BlockFilterCriteria encapsulates log filter criteria for a filter applied
@@ -149,7 +169,7 @@ const schema string = `
         topics: [[Bytes32!]!]
     }
 
-    # Block is an Popcateum block.
+    # Block is an Ethereum block.
     type Block {
         # Number is the number of this block, starting at 0 for the genesis block.
         number: Long!
@@ -176,6 +196,10 @@ const schema string = `
         gasLimit: Long!
         # GasUsed is the amount of gas that was used executing transactions in this block.
         gasUsed: Long!
+        # BaseFeePerGas is the fee per unit of gas burned by the protocol in this block.
+        baseFeePerGas: BigInt
+        # NextBaseFeePerGas is the fee per unit of gas which needs to be burned in the next block.
+        nextBaseFeePerGas: BigInt
         # Timestamp is the unix timestamp at which this block was mined.
         timestamp: Long!
         # LogsBloom is a bloom filter that can be used to check if a block may
@@ -211,13 +235,17 @@ const schema string = `
         transactionAt(index: Int!): Transaction
         # Logs returns a filtered set of logs from this block.
         logs(filter: BlockFilterCriteria!): [Log!]!
-        # Account fetches an Popcateum account at the current block's state.
+        # Account fetches an Ethereum account at the current block's state.
         account(address: Address!): Account!
         # Call executes a local call operation at the current block's state.
         call(data: CallData!): CallResult
         # EstimateGas estimates the amount of gas that will be required for
         # successful execution of a transaction at the current block's state.
         estimateGas(data: CallData!): Long!
+        # RawHeader is the RLP encoding of the block's header.
+        rawHeader: Bytes!
+        # Raw is the RLP encoding of the block.
+        raw: Bytes!
     }
 
     # CallData represents the data associated with a local contract call.
@@ -231,6 +259,10 @@ const schema string = `
         gas: Long
         # GasPrice is the price, in wei, offered for each unit of gas.
         gasPrice: BigInt
+        # MaxFeePerGas is the maximum fee per gas offered, in wei.
+        maxFeePerGas: BigInt
+        # MaxPriorityFeePerGas is the maximum miner tip per gas offered, in wei.
+        maxPriorityFeePerGas: BigInt
         # Value is the value, in wei, sent along with the call.
         value: BigInt
         # Data is the data sent to the callee.
@@ -280,12 +312,6 @@ const schema string = `
         currentBlock: Long!
         # HighestBlock is the latest known block number.
         highestBlock: Long!
-        # PulledStates is the number of state entries fetched so far, or null
-        # if this is not known or not relevant.
-        pulledStates: Long
-        # KnownStates is the number of states the node knows of so far, or null
-        # if this is not known or not relevant.
-        knownStates: Long
     }
 
     # Pending represents the current pending state.
@@ -294,7 +320,7 @@ const schema string = `
       transactionCount: Int!
       # Transactions is a list of transactions in the current pending state.
       transactions: [Transaction!]
-      # Account fetches an Popcateum account for the pending state.
+      # Account fetches an Ethereum account for the pending state.
       account(address: Address!): Account!
       # Call executes a local call operation for the pending state.
       call(data: CallData!): CallResult
@@ -304,7 +330,7 @@ const schema string = `
     }
 
     type Query {
-        # Block fetches an Popcateum block by number or by hash. If neither is
+        # Block fetches an Ethereum block by number or by hash. If neither is
         # supplied, the most recent known block is returned.
         block(number: Long, hash: Bytes32): Block
         # Blocks returns all the blocks between two numbers, inclusive. If
@@ -319,6 +345,9 @@ const schema string = `
         # GasPrice returns the node's estimate of a gas price sufficient to
         # ensure a transaction is mined in a timely fashion.
         gasPrice: BigInt!
+        # MaxPriorityFeePerGas returns the node's estimate of a gas tip sufficient
+        # to ensure a transaction is mined in a timely fashion.
+        maxPriorityFeePerGas: BigInt!
         # Syncing returns information on the current synchronisation state.
         syncing: SyncState
         # ChainID returns the current chain ID for transaction replay protection.

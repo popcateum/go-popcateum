@@ -1,18 +1,18 @@
-// Copyright 2021 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -23,6 +23,7 @@ import (
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/light"
 	"github.com/popcateum/go-popcateum/log"
@@ -36,7 +37,7 @@ type serverBackend interface {
 	ArchiveMode() bool
 	AddTxsSync() bool
 	BlockChain() *core.BlockChain
-	TxPool() *core.TxPool
+	TxPool() *txpool.TxPool
 	GetHelperTrie(typ uint, index uint64) *trie.Trie
 }
 
@@ -347,7 +348,7 @@ func handleGetReceipts(msg Decoder) (serveRequestFn, uint64, uint64, error) {
 			// Retrieve the requested block's receipts, skipping if unknown to us
 			results := bc.GetReceiptsByHash(hash)
 			if results == nil {
-				if header := bc.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
+				if header := bc.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyReceiptsHash {
 					p.bumpInvalid()
 					continue
 				}
@@ -428,13 +429,13 @@ func handleGetProofs(msg Decoder) (serveRequestFn, uint64, uint64, error) {
 					p.bumpInvalid()
 					continue
 				}
-				trie, err = statedb.OpenStorageTrie(common.BytesToHash(request.AccKey), account.Root)
+				trie, err = statedb.OpenStorageTrie(root, common.BytesToHash(request.AccKey), account.Root)
 				if trie == nil || err != nil {
 					p.Log().Warn("Failed to open storage trie for proof", "block", header.Number, "hash", header.Hash(), "account", common.BytesToHash(request.AccKey), "root", account.Root, "err", err)
 					continue
 				}
 			}
-			// Prove the user's request from the account or stroage trie
+			// Prove the user's request from the account or storage trie
 			if err := trie.Prove(request.Key, request.FromLevel, nodes); err != nil {
 				p.Log().Warn("Failed to prove state request", "block", header.Number, "hash", header.Hash(), "err", err)
 				continue
@@ -516,7 +517,7 @@ func handleSendTx(msg Decoder) (serveRequestFn, uint64, uint64, error) {
 			}
 			hash := tx.Hash()
 			stats[i] = txStatus(backend, hash)
-			if stats[i].Status == core.TxStatusUnknown {
+			if stats[i].Status == txpool.TxStatusUnknown {
 				addFn := backend.TxPool().AddRemotes
 				// Add txs synchronously for testing purpose
 				if backend.AddTxsSync() {
@@ -558,10 +559,10 @@ func txStatus(b serverBackend, hash common.Hash) light.TxStatus {
 	stat.Status = b.TxPool().Status([]common.Hash{hash})[0]
 
 	// If the transaction is unknown to the pool, try looking it up locally.
-	if stat.Status == core.TxStatusUnknown {
+	if stat.Status == txpool.TxStatusUnknown {
 		lookup := b.BlockChain().GetTransactionLookup(hash)
 		if lookup != nil {
-			stat.Status = core.TxStatusIncluded
+			stat.Status = txpool.TxStatusIncluded
 			stat.Lookup = lookup
 		}
 	}

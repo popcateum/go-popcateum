@@ -1,0 +1,70 @@
+{
+  "date": "2026-11-10",
+  "platform": "Darwin arm64",
+  "go": "go1.20.14",
+  "legacy_parent": "1f0363dc68395d2de8a11da9404fdfea24d14225",
+  "upstream_parent": "ea9e62ca3db5c33aa7438ebf39c189afd53c6bf8",
+  "checks": [
+    {
+      "command": "make gpop",
+      "result": "passed"
+    },
+    {
+      "command": "make all",
+      "result": "passed"
+    },
+    {
+      "command": "GOTOOLCHAIN=go1.20.14 go test -p 4 ./...",
+      "result": "passed",
+      "passing_packages": 114
+    },
+    {
+      "command": "make lint",
+      "result": "passed",
+      "golangci_lint": "1.51.1"
+    },
+    {
+      "command": "python3 scripts/estimate_ttd.py",
+      "result": "passed",
+      "ttd": "7288681830821503"
+    },
+    {
+      "command": "python3 scripts/smoke_transition.py",
+      "result": "passed",
+      "output": [
+        "MAINNET_DEFAULTS_OK",
+        "TRANSITION_SMOKE_OK {\"terminalHeight\":11,\"terminalTD\":\"1576384\",\"deploymentBlock\":1,\"type2Block\":4}",
+        "RESTART_AT_TTD_OK"
+      ]
+    },
+    {
+      "command": "git diff upstream-v1.11.6 --check",
+      "result": "passed",
+      "note": "The upstream import itself retains pre-existing whitespace; the POP port introduces no additional whitespace errors."
+    }
+  ],
+  "historical_real_ethash_seal_blocks": [
+    1,
+    2,
+    84999,
+    85000,
+    85001,
+    3999999,
+    4000000,
+    4000001,
+    8904999
+  ],
+  "live_node_read_only_recheck": {
+    "height": 8904999,
+    "hash": "0x185e96f351cdaf980c707b80b37097803d092bf36f9841ad384ea5b4dba4ab00",
+    "td": "7288670200714051"
+  },
+  "limitations": [
+    "Full real-chain transaction/state replay not performed.",
+    "Original chain database never opened by new binary; full DB migration on a stopped consistent copy remains to be rehearsed.",
+    "No real deposit contract deployment or beacon/validator finality/merge performed.",
+    "Smoke uses an isolated synthetic genesis, a public test key and a small Ethash test DAG.",
+    "External tests/testdata and tests/evm-benchmarks submodules are not initialized; tests requiring absent upstream fixtures are skipped.",
+    "Docker and Linux/Windows builds not executed."
+  ]
+}

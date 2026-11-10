@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package light
 
@@ -36,19 +36,19 @@ type testTxRelay struct {
 	send, discard, mined chan int
 }
 
-func (self *testTxRelay) Send(txs types.Transactions) {
-	self.send <- len(txs)
+func (r *testTxRelay) Send(txs types.Transactions) {
+	r.send <- len(txs)
 }
 
-func (self *testTxRelay) NewHead(head common.Hash, mined []common.Hash, rollback []common.Hash) {
+func (r *testTxRelay) NewHead(head common.Hash, mined []common.Hash, rollback []common.Hash) {
 	m := len(mined)
 	if m != 0 {
-		self.mined <- m
+		r.mined <- m
 	}
 }
 
-func (self *testTxRelay) Discard(hashes []common.Hash) {
-	self.discard <- len(hashes)
+func (r *testTxRelay) Discard(hashes []common.Hash) {
+	r.discard <- len(hashes)
 }
 
 const poolTestTxs = 1000
@@ -77,24 +77,27 @@ func txPoolTestChainGen(i int, block *core.BlockGen) {
 
 func TestTxPool(t *testing.T) {
 	for i := range testTx {
-		testTx[i], _ = types.SignTx(types.NewTransaction(uint64(i), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
+		testTx[i], _ = types.SignTx(types.NewTransaction(uint64(i), acc1Addr, big.NewInt(10000), params.TxGas, big.NewInt(params.InitialBaseFee), nil), types.HomesteadSigner{}, testBankKey)
 	}
 
 	var (
-		sdb     = rawdb.NewMemoryDatabase()
-		ldb     = rawdb.NewMemoryDatabase()
-		gspec   = core.Genesis{Alloc: core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}}}
-		genesis = gspec.MustCommit(sdb)
+		sdb   = rawdb.NewMemoryDatabase()
+		ldb   = rawdb.NewMemoryDatabase()
+		gspec = &core.Genesis{
+			Config:  params.TestChainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			BaseFee: big.NewInt(params.InitialBaseFee),
+		}
 	)
-	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, ethash.NewFullFaker(), vm.Config{}, nil, nil)
-	gchain, _ := core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), sdb, poolTestBlocks, txPoolTestChainGen)
+	blockchain, _ := core.NewBlockChain(sdb, nil, gspec, nil, ethash.NewFullFaker(), vm.Config{}, nil, nil)
+	_, gchain, _ := core.GenerateChainWithGenesis(gspec, ethash.NewFaker(), poolTestBlocks, txPoolTestChainGen)
 	if _, err := blockchain.InsertChain(gchain); err != nil {
 		panic(err)
 	}
 
-	odr := &testOdr{sdb: sdb, ldb: ldb, indexerConfig: TestClientIndexerConfig}
+	gspec.MustCommit(ldb)
+	odr := &testOdr{sdb: sdb, ldb: ldb, serverState: blockchain.StateCache(), indexerConfig: TestClientIndexerConfig}
 	relay := &testTxRelay{
 		send:    make(chan int, 1),
 		discard: make(chan int, 1),

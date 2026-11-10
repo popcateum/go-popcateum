@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snap
 
@@ -27,7 +27,7 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
-	snap1 = 1
+	SNAP1 = 1
 )
 
 // ProtocolName is the official short name of the `snap` protocol used during
@@ -36,11 +36,11 @@ const ProtocolName = "snap"
 
 // ProtocolVersions are the supported versions of the `snap` protocol (first
 // is primary).
-var ProtocolVersions = []uint{snap1}
+var ProtocolVersions = []uint{SNAP1}
 
 // protocolLengths are the number of implemented message corresponding to
 // different protocol versions.
-var protocolLengths = map[uint]uint64{snap1: 8}
+var protocolLengths = map[uint]uint64{SNAP1: 8}
 
 // maxMessageSize is the maximum cap on the size of a protocol message.
 const maxMessageSize = 10 * 1024 * 1024

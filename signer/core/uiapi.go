@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/accounts/keystore"
@@ -111,7 +111,11 @@ func (s *UIServerAPI) DeriveAccount(url string, path string, pin *bool) (account
 
 // fetchKeystore retrieves the encrypted keystore from the account manager.
 func fetchKeystore(am *accounts.Manager) *keystore.KeyStore {
-	return am.Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	ks := am.Backends(keystore.KeyStoreType)
+	if len(ks) == 0 {
+		return nil
+	}
+	return ks[0].(*keystore.KeyStore)
 }
 
 // ImportRawKey stores the given hex encoded ECDSA key into the key directory,
@@ -156,7 +160,7 @@ func (s *UIServerAPI) ChainId() math.HexOrDecimal64 {
 }
 
 // SetChainId sets the chain id to use when signing transactions.
-// Example call to set Longcat:
+// Example call to set Ropsten:
 // {"jsonrpc":"2.0","method":"clef_setChainId","params":["3"], "id":8}
 func (s *UIServerAPI) SetChainId(id math.HexOrDecimal64) math.HexOrDecimal64 {
 	s.extApi.chainID = new(big.Int).SetUint64(uint64(id))
@@ -175,7 +179,7 @@ func (s *UIServerAPI) Export(ctx context.Context, addr common.Address) (json.Raw
 	if wallet.URL().Scheme != keystore.KeyStoreScheme {
 		return nil, fmt.Errorf("account is not a keystore-account")
 	}
-	return ioutil.ReadFile(wallet.URL().Path)
+	return os.ReadFile(wallet.URL().Path)
 }
 
 // Import tries to import the given keyJSON in the local keystore. The keyJSON data is expected to be

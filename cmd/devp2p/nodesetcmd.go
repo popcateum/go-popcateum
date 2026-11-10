@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -29,25 +29,25 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/enr"
 	"github.com/popcateum/go-popcateum/params"
 	"github.com/popcateum/go-popcateum/rlp"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
 var (
-	nodesetCommand = cli.Command{
+	nodesetCommand = &cli.Command{
 		Name:  "nodeset",
 		Usage: "Node set tools",
-		Subcommands: []cli.Command{
+		Subcommands: []*cli.Command{
 			nodesetInfoCommand,
 			nodesetFilterCommand,
 		},
 	}
-	nodesetInfoCommand = cli.Command{
+	nodesetInfoCommand = &cli.Command{
 		Name:      "info",
 		Usage:     "Shows statistics about a node set",
 		Action:    nodesetInfo,
 		ArgsUsage: "<nodes.json>",
 	}
-	nodesetFilterCommand = cli.Command{
+	nodesetFilterCommand = &cli.Command{
 		Name:      "filter",
 		Usage:     "Filters a node set",
 		Action:    nodesetFilter,
@@ -181,7 +181,7 @@ func parseFilterLimit(args []string) (int, error) {
 	return limit, nil
 }
 
-// andFilter parses node filters in args and and returns a single filter that requires all
+// andFilter parses node filters in args and returns a single filter that requires all
 // of them to match.
 func andFilter(args []string) (nodeFilter, error) {
 	checks, err := parseFilters(args)
@@ -233,8 +233,8 @@ func ethFilter(args []string) (nodeFilter, error) {
 		filter = forkid.NewStaticFilter(params.RinkebyChainConfig, params.RinkebyGenesisHash)
 	case "goerli":
 		filter = forkid.NewStaticFilter(params.GoerliChainConfig, params.GoerliGenesisHash)
-	case "longcat":
-		filter = forkid.NewStaticFilter(params.LongcatChainConfig, params.LongcatGenesisHash)
+	case "sepolia":
+		filter = forkid.NewStaticFilter(params.SepoliaChainConfig, params.SepoliaGenesisHash)
 	default:
 		return nil, fmt.Errorf("unknown network %q", args[0])
 	}

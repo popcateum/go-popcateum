@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package keystore
 
@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/log"
@@ -79,7 +79,7 @@ func newAccountCache(keydir string) (*accountCache, chan struct{}) {
 		keydir: keydir,
 		byAddr: make(map[common.Address][]accounts.Account),
 		notify: make(chan struct{}, 1),
-		fileC:  fileCache{all: mapset.NewThreadUnsafeSet()},
+		fileC:  fileCache{all: mapset.NewThreadUnsafeSet[string]()},
 	}
 	ac.watcher = newWatcher(ac)
 	return ac, ac.notify
@@ -144,6 +144,14 @@ func (ac *accountCache) deleteByFile(path string) {
 			ac.byAddr[removed.Address] = ba
 		}
 	}
+}
+
+// watcherStarted returns true if the watcher loop started running (even if it
+// has since also ended).
+func (ac *accountCache) watcherStarted() bool {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+	return ac.watcher.running || ac.watcher.runEnded
 }
 
 func removeAccount(slice []accounts.Account, elem accounts.Account) []accounts.Account {
@@ -275,16 +283,15 @@ func (ac *accountCache) scanAccounts() error {
 	// Process all the file diffs
 	start := time.Now()
 
-	for _, p := range creates.ToSlice() {
-		if a := readAccount(p.(string)); a != nil {
+	for _, path := range creates.ToSlice() {
+		if a := readAccount(path); a != nil {
 			ac.add(*a)
 		}
 	}
-	for _, p := range deletes.ToSlice() {
-		ac.deleteByFile(p.(string))
+	for _, path := range deletes.ToSlice() {
+		ac.deleteByFile(path)
 	}
-	for _, p := range updates.ToSlice() {
-		path := p.(string)
+	for _, path := range updates.ToSlice() {
 		ac.deleteByFile(path)
 		if a := readAccount(path); a != nil {
 			ac.add(*a)

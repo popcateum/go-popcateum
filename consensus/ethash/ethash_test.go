@@ -1,23 +1,22 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
 import (
-	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
@@ -57,7 +56,9 @@ func TestTestMode(t *testing.T) {
 // This test checks that cache lru logic doesn't crash under load.
 // It reproduces https://github.com/popcateum/go-popcateum/issues/14943
 func TestCacheFileEvict(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "ethash-test")
+	// TODO: t.TempDir fails to remove the directory on Windows
+	// \AppData\Local\Temp\1\TestCacheFileEvict2179435125\001\cache-R23-0000000000000000: Access is denied.
+	tmpdir, err := os.MkdirTemp("", "ethash-test")
 	if err != nil {
 		t.Fatal(err)
 	}

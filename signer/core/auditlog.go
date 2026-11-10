@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
@@ -24,6 +24,7 @@ import (
 	"github.com/popcateum/go-popcateum/common/hexutil"
 	"github.com/popcateum/go-popcateum/internal/ethapi"
 	"github.com/popcateum/go-popcateum/log"
+	"github.com/popcateum/go-popcateum/signer/core/apitypes"
 )
 
 type AuditLogger struct {
@@ -43,7 +44,7 @@ func (l *AuditLogger) New(ctx context.Context) (common.Address, error) {
 	return l.api.New(ctx)
 }
 
-func (l *AuditLogger) SignTransaction(ctx context.Context, args SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error) {
+func (l *AuditLogger) SignTransaction(ctx context.Context, args apitypes.SendTxArgs, methodSelector *string) (*ethapi.SignTransactionResult, error) {
 	sel := "<nil>"
 	if methodSelector != nil {
 		sel = *methodSelector
@@ -88,7 +89,7 @@ func (l *AuditLogger) SignGnosisSafeTx(ctx context.Context, addr common.Mixedcas
 	return res, e
 }
 
-func (l *AuditLogger) SignTypedData(ctx context.Context, addr common.MixedcaseAddress, data TypedData) (hexutil.Bytes, error) {
+func (l *AuditLogger) SignTypedData(ctx context.Context, addr common.MixedcaseAddress, data apitypes.TypedData) (hexutil.Bytes, error) {
 	l.log.Info("SignTypedData", "type", "request", "metadata", MetadataFromContext(ctx).String(),
 		"addr", addr.String(), "data", data)
 	b, e := l.api.SignTypedData(ctx, addr, data)
@@ -109,7 +110,6 @@ func (l *AuditLogger) Version(ctx context.Context) (string, error) {
 	data, err := l.api.Version(ctx)
 	l.log.Info("Version", "type", "response", "data", data, "error", err)
 	return data, err
-
 }
 
 func NewAuditLogger(path string, api ExternalAPI) (*AuditLogger, error) {

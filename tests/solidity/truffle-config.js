@@ -1,3 +1,19 @@
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
+//
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-ethereum library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Use this file to configure your truffle project. It's seeded with some
  * common settings for different networks and features like migrations,
@@ -26,7 +42,7 @@
 
 // module.exports = {
 //   /**
-//    * Networks define how you connect to your popcateum client and let you set the
+//    * Networks define how you connect to your ethereum client and let you set the
 //    * defaults web3 uses to send transactions. If you don't specify one truffle
 //    * will spin up a development blockchain for you on port 9545 when you
 //    * run `develop` or `test`. You can ask a truffle command to use a specific
@@ -38,13 +54,13 @@
 //   networks: {
 //     // Useful for testing. The `development` name is special - truffle uses it by default
 //     // if it's defined here and no other network is specified at the command line.
-//     // You should run a client (like ganache-cli, gpop or parity) in a separate terminal
+//     // You should run a client (like ganache-cli, geth or parity) in a separate terminal
 //     // tab if you use this network and you must also set the `host`, `port` and `network_id`
 //     // options below to some value.
 //     //
 //     // development: {
 //     //  host: "127.0.0.1",     // Localhost (default: none)
-//     //  port: 8545,            // Standard Popcateum port (default: none)
+//     //  port: 8545,            // Standard Ethereum port (default: none)
 //     //  network_id: "*",       // Any network (default: none)
 //     // },
 //
@@ -60,10 +76,10 @@
 //
 //     // Useful for deploying to a public network.
 //     // NB: It's important to wrap the provider as a function.
-//     // longcat: {
-//       // provider: () => new HDWalletProvider(mnemonic, `https://longcat.infura.io/${infuraKey}`),
-//       // network_id: 3,       // Longcat's id
-//       // gas: 5500000,        // Longcat has a lower block limit than mainnet
+//     // ropsten: {
+//       // provider: () => new HDWalletProvider(mnemonic, `https://ropsten.infura.io/${infuraKey}`),
+//       // network_id: 3,       // Ropsten's id
+//       // gas: 5500000,        // Ropsten has a lower block limit than mainnet
 //       // confirmations: 2,    // # of confs to wait between deployments. (default: 0)
 //       // timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
 //       // skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )

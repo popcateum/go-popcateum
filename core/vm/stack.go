@@ -1,23 +1,22 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/holiman/uint256"
@@ -54,10 +53,6 @@ func (st *Stack) push(d *uint256.Int) {
 	// NOTE push limit (1024) is checked in baseCheck
 	st.data = append(st.data, *d)
 }
-func (st *Stack) pushN(ds ...uint256.Int) {
-	// FIXME: Is there a way to pass args by pointers.
-	st.data = append(st.data, ds...)
-}
 
 func (st *Stack) pop() (ret uint256.Int) {
 	ret = st.data[len(st.data)-1]
@@ -84,17 +79,4 @@ func (st *Stack) peek() *uint256.Int {
 // Back returns the n'th item in stack
 func (st *Stack) Back(n int) *uint256.Int {
 	return &st.data[st.len()-n-1]
-}
-
-// Print dumps the content of the stack
-func (st *Stack) Print() {
-	fmt.Println("### stack ###")
-	if len(st.data) > 0 {
-		for i, val := range st.data {
-			fmt.Printf("%-3d  %v\n", i, val)
-		}
-	} else {
-		fmt.Println("-- empty --")
-	}
-	fmt.Println("#############")
 }

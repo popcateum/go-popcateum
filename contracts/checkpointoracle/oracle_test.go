@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package checkpointoracle
 
@@ -175,7 +175,13 @@ func TestCheckpointRegister(t *testing.T) {
 	sort.Sort(accounts)
 
 	// Deploy registrar contract
-	contractBackend := backends.NewSimulatedBackend(core.GenesisAlloc{accounts[0].addr: {Balance: big.NewInt(1000000000)}, accounts[1].addr: {Balance: big.NewInt(1000000000)}, accounts[2].addr: {Balance: big.NewInt(1000000000)}}, 10000000)
+	contractBackend := backends.NewSimulatedBackend(
+		core.GenesisAlloc{
+			accounts[0].addr: {Balance: big.NewInt(10000000000000000)},
+			accounts[1].addr: {Balance: big.NewInt(10000000000000000)},
+			accounts[2].addr: {Balance: big.NewInt(10000000000000000)},
+		}, 10000000,
+	)
 	defer contractBackend.Close()
 
 	transactOpts, _ := bind.NewKeyedTransactorWithChainID(accounts[0].key, big.NewInt(1337))

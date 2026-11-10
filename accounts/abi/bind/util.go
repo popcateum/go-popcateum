@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bind
 
@@ -21,6 +21,7 @@ import (
 	"errors"
 	"time"
 
+	ethereum "github.com/popcateum/go-popcateum"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/log"
@@ -35,14 +36,16 @@ func WaitMined(ctx context.Context, b DeployBackend, tx *types.Transaction) (*ty
 	logger := log.New("hash", tx.Hash())
 	for {
 		receipt, err := b.TransactionReceipt(ctx, tx.Hash())
-		if receipt != nil {
+		if err == nil {
 			return receipt, nil
 		}
-		if err != nil {
-			logger.Trace("Receipt retrieval failed", "err", err)
-		} else {
+
+		if errors.Is(err, ethereum.NotFound) {
 			logger.Trace("Transaction not yet mined")
+		} else {
+			logger.Trace("Receipt retrieval failed", "err", err)
 		}
+
 		// Wait for the next round.
 		select {
 		case <-ctx.Done():

@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package scwallet
 
@@ -26,8 +26,8 @@ import (
 	"crypto/sha512"
 	"fmt"
 
-	"github.com/popcateum/go-popcateum/crypto"
 	pcsc "github.com/gballet/go-libpcsclite"
+	"github.com/popcateum/go-popcateum/crypto"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/text/unicode/norm"
 )
@@ -178,7 +178,7 @@ func (s *SecureChannelSession) mutuallyAuthenticate() error {
 		return err
 	}
 	if response.Sw1 != 0x90 || response.Sw2 != 0x00 {
-		return fmt.Errorf("got unexpected response from MUTUALLY_AUTHENTICATE: 0x%x%x", response.Sw1, response.Sw2)
+		return fmt.Errorf("got unexpected response from MUTUALLY_AUTHENTICATE: %#x%x", response.Sw1, response.Sw2)
 	}
 
 	if len(response.Data) != scSecretLength {
@@ -261,7 +261,7 @@ func (s *SecureChannelSession) transmitEncrypted(cla, ins, p1, p2 byte, data []b
 	rapdu.deserialize(plainData)
 
 	if rapdu.Sw1 != sw1Ok {
-		return nil, fmt.Errorf("unexpected response status Cla=0x%x, Ins=0x%x, Sw=0x%x%x", cla, ins, rapdu.Sw1, rapdu.Sw2)
+		return nil, fmt.Errorf("unexpected response status Cla=%#x, Ins=%#x, Sw=%#x%x", cla, ins, rapdu.Sw1, rapdu.Sw2)
 	}
 
 	return rapdu, nil

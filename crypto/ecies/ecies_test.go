@@ -23,7 +23,7 @@
 // SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
 // LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHPOPCAT IN CONTRACT, STRICT LIABILITY, OR TORT
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
@@ -279,7 +279,7 @@ var testCases = []testCase{
 	{
 		Curve:    elliptic.P384(),
 		Name:     "P384",
-		Expected: ECIES_AES256_SHA384,
+		Expected: ECIES_AES192_SHA384,
 	},
 	{
 		Curve:    elliptic.P521(),
@@ -334,7 +334,6 @@ func testParamSelection(t *testing.T, c testCase) {
 	if err == nil {
 		t.Fatalf("ecies: encryption should not have succeeded (%s)\n", c.Name)
 	}
-
 }
 
 // Ensure that the basic public key validation in the decryption operation

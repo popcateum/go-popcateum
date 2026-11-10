@@ -1,6 +1,6 @@
 ---
 name: Report a bug
-about: Something with go-popcateum is not working as expected
+about: Something with go-ethereum is not working as expected
 title: ''
 labels: 'type:bug'
 assignees: ''
@@ -8,7 +8,8 @@ assignees: ''
 
 #### System information
 
-Gpop version: `gpop version`
+Geth version: `geth version`
+CL client & version: e.g. lighthouse/nimbus/prysm@v1.0.0
 OS & Version: Windows/Linux/OSX
 Commit hash : (if `develop`)
 

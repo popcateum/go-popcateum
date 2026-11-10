@@ -1,22 +1,23 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
 import (
+	"encoding/json"
 	"math/big"
 	"reflect"
 	"testing"
@@ -28,16 +29,15 @@ import (
 	"github.com/popcateum/go-popcateum/core/vm"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/params"
+	"github.com/popcateum/go-popcateum/trie"
 )
 
-func TestDefaultGenesisBlock(t *testing.T) {
-	block := DefaultGenesisBlock().ToBlock(nil)
-	if block.Hash() != params.MainnetGenesisHash {
-		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), params.MainnetGenesisHash)
-	}
-	block = DefaultLongcatGenesisBlock().ToBlock(nil)
-	if block.Hash() != params.LongcatGenesisHash {
-		t.Errorf("wrong longcat genesis hash, got %v, want %v", block.Hash(), params.LongcatGenesisHash)
+func TestInvalidCliqueConfig(t *testing.T) {
+	block := DefaultGoerliGenesisBlock()
+	block.ExtraData = []byte{}
+	db := rawdb.NewMemoryDatabase()
+	if _, err := block.Commit(db, trie.NewDatabase(db)); err == nil {
+		t.Fatal("Expected error on invalid clique config")
 	}
 }
 
@@ -63,7 +63,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return SetupGenesisBlock(db, new(Genesis))
+				return SetupGenesisBlock(db, trie.NewDatabase(db), new(Genesis))
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: params.AllEthashProtocolChanges,
@@ -71,7 +71,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return SetupGenesisBlock(db, nil)
+				return SetupGenesisBlock(db, trie.NewDatabase(db), nil)
 			},
 			wantHash:   params.MainnetGenesisHash,
 			wantConfig: params.MainnetChainConfig,
@@ -80,7 +80,7 @@ func TestSetupGenesis(t *testing.T) {
 			name: "mainnet block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				DefaultGenesisBlock().MustCommit(db)
-				return SetupGenesisBlock(db, nil)
+				return SetupGenesisBlock(db, trie.NewDatabase(db), nil)
 			},
 			wantHash:   params.MainnetGenesisHash,
 			wantConfig: params.MainnetChainConfig,
@@ -89,26 +89,26 @@ func TestSetupGenesis(t *testing.T) {
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
-				return SetupGenesisBlock(db, nil)
+				return SetupGenesisBlock(db, trie.NewDatabase(db), nil)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 		},
 		{
-			name: "custom block in DB, genesis == longcat",
+			name: "custom block in DB, genesis == goerli",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
-				return SetupGenesisBlock(db, DefaultLongcatGenesisBlock())
+				return SetupGenesisBlock(db, trie.NewDatabase(db), DefaultGoerliGenesisBlock())
 			},
-			wantErr:    &GenesisMismatchError{Stored: customghash, New: params.LongcatGenesisHash},
-			wantHash:   params.LongcatGenesisHash,
-			wantConfig: params.LongcatChainConfig,
+			wantErr:    &GenesisMismatchError{Stored: customghash, New: params.GoerliGenesisHash},
+			wantHash:   params.GoerliGenesisHash,
+			wantConfig: params.GoerliChainConfig,
 		},
 		{
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				oldcustomg.MustCommit(db)
-				return SetupGenesisBlock(db, &customg)
+				return SetupGenesisBlock(db, trie.NewDatabase(db), &customg)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -120,22 +120,22 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{}, nil, nil)
+				bc, _ := NewBlockChain(db, nil, &oldcustomg, nil, ethash.NewFullFaker(), vm.Config{}, nil, nil)
 				defer bc.Stop()
 
 				blocks, _ := GenerateChain(oldcustomg.Config, genesis, ethash.NewFaker(), db, 4, nil)
 				bc.InsertChain(blocks)
-				bc.CurrentBlock()
+
 				// This should return a compatibility error.
-				return SetupGenesisBlock(db, &customg)
+				return SetupGenesisBlock(db, trie.NewDatabase(db), &customg)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 			wantErr: &params.ConfigCompatError{
-				What:         "Homestead fork block",
-				StoredConfig: big.NewInt(2),
-				NewConfig:    big.NewInt(3),
-				RewindTo:     1,
+				What:          "Homestead fork block",
+				StoredBlock:   big.NewInt(2),
+				NewBlock:      big.NewInt(3),
+				RewindToBlock: 1,
 			},
 		},
 	}
@@ -163,37 +163,83 @@ func TestSetupGenesis(t *testing.T) {
 	}
 }
 
-// TestGenesisHashes checks the congruity of default genesis data to corresponding hardcoded genesis hash values.
+// TestGenesisHashes checks the congruity of default genesis data to
+// corresponding hardcoded genesis hash values.
 func TestGenesisHashes(t *testing.T) {
-	cases := []struct {
+	for i, c := range []struct {
 		genesis *Genesis
-		hash    common.Hash
+		want    common.Hash
 	}{
-		{
-			genesis: DefaultGenesisBlock(),
-			hash:    params.MainnetGenesisHash,
-		},
-		{
-			genesis: DefaultGoerliGenesisBlock(),
-			hash:    params.GoerliGenesisHash,
-		},
-		{
-			genesis: DefaultLongcatGenesisBlock(),
-			hash:    params.LongcatGenesisHash,
-		},
-		{
-			genesis: DefaultRinkebyGenesisBlock(),
-			hash:    params.RinkebyGenesisHash,
-		},
-		{
-			genesis: DefaultYoloV3GenesisBlock(),
-			hash:    params.YoloV3GenesisHash,
-		},
+		{DefaultGenesisBlock(), params.MainnetGenesisHash},
+		{DefaultGoerliGenesisBlock(), params.GoerliGenesisHash},
+		{DefaultRinkebyGenesisBlock(), params.RinkebyGenesisHash},
+		{DefaultSepoliaGenesisBlock(), params.SepoliaGenesisHash},
+	} {
+		// Test via MustCommit
+		if have := c.genesis.MustCommit(rawdb.NewMemoryDatabase()).Hash(); have != c.want {
+			t.Errorf("case: %d a), want: %s, got: %s", i, c.want.Hex(), have.Hex())
+		}
+		// Test via ToBlock
+		if have := c.genesis.ToBlock().Hash(); have != c.want {
+			t.Errorf("case: %d a), want: %s, got: %s", i, c.want.Hex(), have.Hex())
+		}
 	}
-	for i, c := range cases {
-		b := c.genesis.MustCommit(rawdb.NewMemoryDatabase())
-		if got := b.Hash(); got != c.hash {
-			t.Errorf("case: %d, want: %s, got: %s", i, c.hash.Hex(), got.Hex())
+}
+
+func TestGenesis_Commit(t *testing.T) {
+	genesis := &Genesis{
+		BaseFee: big.NewInt(params.InitialBaseFee),
+		Config:  params.TestChainConfig,
+		// difficulty is nil
+	}
+
+	db := rawdb.NewMemoryDatabase()
+	genesisBlock := genesis.MustCommit(db)
+
+	if genesis.Difficulty != nil {
+		t.Fatalf("assumption wrong")
+	}
+
+	// This value should have been set as default in the ToBlock method.
+	if genesisBlock.Difficulty().Cmp(params.GenesisDifficulty) != 0 {
+		t.Errorf("assumption wrong: want: %d, got: %v", params.GenesisDifficulty, genesisBlock.Difficulty())
+	}
+
+	// Expect the stored total difficulty to be the difficulty of the genesis block.
+	stored := rawdb.ReadTd(db, genesisBlock.Hash(), genesisBlock.NumberU64())
+
+	if stored.Cmp(genesisBlock.Difficulty()) != 0 {
+		t.Errorf("inequal difficulty; stored: %v, genesisBlock: %v", stored, genesisBlock.Difficulty())
+	}
+}
+
+func TestReadWriteGenesisAlloc(t *testing.T) {
+	var (
+		db    = rawdb.NewMemoryDatabase()
+		alloc = &GenesisAlloc{
+			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
+			{2}: {Balance: big.NewInt(2), Storage: map[common.Hash]common.Hash{{2}: {2}}},
+		}
+		hash, _ = alloc.deriveHash()
+	)
+	blob, _ := json.Marshal(alloc)
+	rawdb.WriteGenesisStateSpec(db, hash, blob)
+
+	var reload GenesisAlloc
+	err := reload.UnmarshalJSON(rawdb.ReadGenesisStateSpec(db, hash))
+	if err != nil {
+		t.Fatalf("Failed to load genesis state %v", err)
+	}
+	if len(reload) != len(*alloc) {
+		t.Fatal("Unexpected genesis allocation")
+	}
+	for addr, account := range reload {
+		want, ok := (*alloc)[addr]
+		if !ok {
+			t.Fatal("Account is not found")
+		}
+		if !reflect.DeepEqual(want, account) {
+			t.Fatal("Unexpected account")
 		}
 	}
 }

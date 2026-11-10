@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rpc
 
@@ -54,9 +54,20 @@ var (
 	_ Error = new(invalidRequestError)
 	_ Error = new(invalidMessageError)
 	_ Error = new(invalidParamsError)
+	_ Error = new(internalServerError)
 )
 
-const defaultErrorCode = -32000
+const (
+	errcodeDefault                  = -32000
+	errcodeNotificationsUnsupported = -32001
+	errcodeTimeout                  = -32002
+	errcodePanic                    = -32603
+	errcodeMarshalError             = -32603
+)
+
+const (
+	errMsgTimeout = "request timed out"
+)
 
 type methodNotFoundError struct{ method string }
 
@@ -101,3 +112,13 @@ type invalidParamsError struct{ message string }
 func (e *invalidParamsError) ErrorCode() int { return -32602 }
 
 func (e *invalidParamsError) Error() string { return e.message }
+
+// internalServerError is used for server errors during request processing.
+type internalServerError struct {
+	code    int
+	message string
+}
+
+func (e *internalServerError) ErrorCode() int { return e.code }
+
+func (e *internalServerError) Error() string { return e.message }

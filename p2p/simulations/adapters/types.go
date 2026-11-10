@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package adapters
 
@@ -26,6 +26,7 @@ import (
 	"strconv"
 
 	"github.com/docker/docker/pkg/reexec"
+	"github.com/gorilla/websocket"
 	"github.com/popcateum/go-popcateum/crypto"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/node"
@@ -33,16 +34,14 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/p2p/enr"
 	"github.com/popcateum/go-popcateum/rpc"
-	"github.com/gorilla/websocket"
 )
 
 // Node represents a node in a simulation network which is created by a
 // NodeAdapter, for example:
 //
-// * SimNode    - An in-memory node
-// * ExecNode   - A child process node
-// * DockerNode - A Docker container node
-//
+//   - SimNode, an in-memory node in the same process
+//   - ExecNode, a child process node
+//   - DockerNode, a node running in a Docker container
 type Node interface {
 	// Addr returns the node's address (e.g. an Enode URL)
 	Addr() []byte
@@ -242,7 +241,7 @@ func assignTCPPort() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	p, err := strconv.ParseInt(port, 10, 32)
+	p, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
 		return 0, err
 	}
@@ -260,7 +259,7 @@ type ServiceContext struct {
 
 // RPCDialer is used when initialising services which need to connect to
 // other nodes in the network (for example a simulated Swarm node which needs
-// to connect to a Gpop node to resolve ENS names)
+// to connect to a Geth node to resolve ENS names)
 type RPCDialer interface {
 	DialRPC(id enode.ID) (*rpc.Client, error)
 }

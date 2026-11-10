@@ -1,32 +1,28 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snapshot
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core/rawdb"
-	"github.com/popcateum/go-popcateum/ethdb"
-	"github.com/popcateum/go-popcateum/ethdb/leveldb"
 	"github.com/popcateum/go-popcateum/ethdb/memorydb"
 	"github.com/popcateum/go-popcateum/rlp"
 )
@@ -518,18 +514,9 @@ func TestDiskMidAccountPartialMerge(t *testing.T) {
 // TestDiskSeek tests that seek-operations work on the disk layer
 func TestDiskSeek(t *testing.T) {
 	// Create some accounts in the disk layer
-	var db ethdb.Database
+	db := rawdb.NewMemoryDatabase()
+	defer db.Close()
 
-	if dir, err := ioutil.TempDir("", "disklayer-test"); err != nil {
-		t.Fatal(err)
-	} else {
-		defer os.RemoveAll(dir)
-		diskdb, err := leveldb.New(dir, 256, 0, "", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		db = rawdb.NewDatabase(diskdb)
-	}
 	// Fill even keys [0,2,4...]
 	for i := 0; i < 0xff; i += 2 {
 		acc := common.Hash{byte(i)}

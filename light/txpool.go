@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package light
 
@@ -27,6 +27,7 @@ import (
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/event"
@@ -69,17 +70,19 @@ type TxPool struct {
 
 	istanbul bool // Fork indicator whether we are in the istanbul stage.
 	eip2718  bool // Fork indicator whether we are in the eip2718 stage.
+	shanghai bool // Fork indicator whether we are in the shanghai stage.
 }
 
-// TxRelayBackend provides an interface to the mechanism that forwards transacions
-// to the ETH network. The implementations of the functions should be non-blocking.
+// TxRelayBackend provides an interface to the mechanism that forwards transactions to the
+// ETH network. The implementations of the functions should be non-blocking.
 //
-// Send instructs backend to forward new transactions
-// NewHead notifies backend about a new head after processed by the tx pool,
-//  including  mined and rolled back transactions since the last event
-// Discard notifies backend about transactions that should be discarded either
-//  because they have been replaced by a re-send or because they have been mined
-//  long ago and no rollback is expected
+// Send instructs backend to forward new transactions NewHead notifies backend about a new
+// head after processed by the tx pool, including mined and rolled back transactions since
+// the last event.
+//
+// Discard notifies backend about transactions that should be discarded either because
+// they have been replaced by a re-send or because they have been mined long ago and no
+// rollback is expected.
 type TxRelayBackend interface {
 	Send(txs types.Transactions)
 	NewHead(head common.Hash, mined []common.Hash, rollback []common.Hash)
@@ -181,7 +184,7 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, number 
 	}
 	// If some transactions have been mined, write the needed data to disk and update
 	if list != nil {
-		// Retrieve all the receipts belonging to this block and write the loopup table
+		// Retrieve all the receipts belonging to this block and write the lookup table
 		if _, err := GetBlockReceipts(ctx, pool.odr, hash, number); err != nil { // ODR caches, ignore results
 			return err
 		}
@@ -315,6 +318,7 @@ func (pool *TxPool) setNewHead(head *types.Header) {
 	next := new(big.Int).Add(head.Number, big.NewInt(1))
 	pool.istanbul = pool.config.IsIstanbul(next)
 	pool.eip2718 = pool.config.IsBerlin(next)
+	pool.shanghai = pool.config.IsShanghai(uint64(time.Now().Unix()))
 }
 
 // Stop stops the light transaction pool
@@ -353,7 +357,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	// Validate the transaction sender and it's sig. Throw
 	// if the from fields is invalid.
 	if from, err = types.Sender(pool.signer, tx); err != nil {
-		return core.ErrInvalidSender
+		return txpool.ErrInvalidSender
 	}
 	// Last but not least check for nonce errors
 	currentState := pool.currentState(ctx)
@@ -365,14 +369,14 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	// block limit gas.
 	header := pool.chain.GetHeaderByHash(pool.head)
 	if header.GasLimit < tx.Gas() {
-		return core.ErrGasLimit
+		return txpool.ErrGasLimit
 	}
 
 	// Transactions can't be negative. This may never happen
 	// using RLP decoded transactions but may occur if you create
 	// a transaction using the RPC for example.
 	if tx.Value().Sign() < 0 {
-		return core.ErrNegativeValue
+		return txpool.ErrNegativeValue
 	}
 
 	// Transactor should have enough funds to cover the costs
@@ -382,7 +386,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	}
 
 	// Should supply enough intrinsic gas
-	gas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
+	gas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul, pool.shanghai)
 	if err != nil {
 		return err
 	}
@@ -398,7 +402,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 	hash := tx.Hash()
 
 	if pool.pending[hash] != nil {
-		return fmt.Errorf("Known transaction (%x)", hash[:4])
+		return fmt.Errorf("known transaction (%x)", hash[:4])
 	}
 	err := pool.validateTx(ctx, tx)
 	if err != nil {
@@ -446,7 +450,7 @@ func (pool *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	return nil
 }
 
-// AddTransactions adds all valid transactions to the pool and passes them to
+// AddBatch adds all valid transactions to the pool and passes them to
 // the tx relay backend
 func (pool *TxPool) AddBatch(ctx context.Context, txs []*types.Transaction) {
 	pool.mu.Lock()
@@ -503,6 +507,25 @@ func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common
 	// There are no queued transactions in a light pool, just return an empty map
 	queued := make(map[common.Address]types.Transactions)
 	return pending, queued
+}
+
+// ContentFrom retrieves the data content of the transaction pool, returning the
+// pending as well as queued transactions of this address, grouped by nonce.
+func (pool *TxPool) ContentFrom(addr common.Address) (types.Transactions, types.Transactions) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+
+	// Retrieve the pending transactions and sort by nonce
+	var pending types.Transactions
+	for _, tx := range pool.pending {
+		account, _ := types.Sender(pool.signer, tx)
+		if account != addr {
+			continue
+		}
+		pending = append(pending, tx)
+	}
+	// There are no queued transactions in a light pool, just return an empty map
+	return pending, types.Transactions{}
 }
 
 // RemoveTransactions removes all given transactions from the pool.

@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package discover implements the Node Discovery Protocol.
 //
@@ -672,15 +672,14 @@ func (h *nodesByDistance) push(n *node, maxElems int) {
 	ix := sort.Search(len(h.entries), func(i int) bool {
 		return enode.DistCmp(h.target, h.entries[i].ID(), n.ID()) > 0
 	})
+
+	end := len(h.entries)
 	if len(h.entries) < maxElems {
 		h.entries = append(h.entries, n)
 	}
-	if ix == len(h.entries) {
-		// farther away than all nodes we already have.
-		// if there was room for it, the node is now the last element.
-	} else {
-		// slide existing entries down to make room
-		// this will overwrite the entry we just appended.
+	if ix < end {
+		// Slide existing entries down to make room.
+		// This will overwrite the entry we just appended.
 		copy(h.entries[ix+1:], h.entries[ix:])
 		h.entries[ix] = n
 	}

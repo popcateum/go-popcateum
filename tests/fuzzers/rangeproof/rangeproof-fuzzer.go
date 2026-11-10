@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rangeproof
 
@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/ethdb/memorydb"
 	"github.com/popcateum/go-popcateum/trie"
 )
@@ -61,16 +62,15 @@ func (f *fuzzer) readInt() uint64 {
 }
 
 func (f *fuzzer) randomTrie(n int) (*trie.Trie, map[string]*kv) {
-
-	trie := new(trie.Trie)
+	trie := trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
 	vals := make(map[string]*kv)
 	size := f.readInt()
 	// Fill it with some fluff
 	for i := byte(0); i < byte(size); i++ {
 		value := &kv{common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
 		value2 := &kv{common.LeftPadBytes([]byte{i + 10}, 32), []byte{i}, false}
-		trie.Update(value.k, value.v)
-		trie.Update(value2.k, value2.v)
+		trie.MustUpdate(value.k, value.v)
+		trie.MustUpdate(value2.k, value2.v)
 		vals[string(value.k)] = value
 		vals[string(value2.k)] = value2
 	}
@@ -82,7 +82,7 @@ func (f *fuzzer) randomTrie(n int) (*trie.Trie, map[string]*kv) {
 		k := f.randBytes(32)
 		v := f.randBytes(20)
 		value := &kv{k, v, false}
-		trie.Update(k, v)
+		trie.MustUpdate(k, v)
 		vals[string(k)] = value
 		if f.exhausted {
 			return nil, nil
@@ -163,7 +163,6 @@ func (f *fuzzer) fuzz() int {
 			// Modify something in the proof db
 			// add stuff to proof db
 			// drop stuff from proof db
-
 		}
 		if f.exhausted {
 			break
@@ -180,12 +179,16 @@ func (f *fuzzer) fuzz() int {
 	return ok
 }
 
+// Fuzz is the fuzzing entry-point.
 // The function must return
-// 1 if the fuzzer should increase priority of the
-//   given input during subsequent fuzzing (for example, the input is lexically
-//   correct and was parsed successfully);
-// -1 if the input must not be added to corpus even if gives new coverage; and
-// 0 otherwise; other values are reserved for future use.
+//
+//   - 1 if the fuzzer should increase priority of the
+//     given input during subsequent fuzzing (for example, the input is lexically
+//     correct and was parsed successfully);
+//   - -1 if the input must not be added to corpus even if gives new coverage; and
+//   - 0 otherwise
+//
+// other values are reserved for future use.
 func Fuzz(input []byte) int {
 	if len(input) < 100 {
 		return 0

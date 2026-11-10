@@ -1,0 +1,23 @@
+{
+  "basis_head": 8904999,
+  "basis_hash": "0x185e96f351cdaf980c707b80b37097803d092bf36f9841ad384ea5b4dba4ab00",
+  "basis_td": "7288670200714051",
+  "target_first_pos_height": 8910000,
+  "estimated_additional_pow_blocks": 5000,
+  "sample_count": 512,
+  "sample_mean_difficulty": 837696,
+  "head_difficulty": 941264,
+  "average_block_seconds": 1.751953125,
+  "historical_hashrate_proxy": 478149.77926421404,
+  "hashrate_scale": 1.0,
+  "historical_uncle_parent_fraction": 0.0,
+  "runs": 128,
+  "seed": 20261110,
+  "long_pause": true,
+  "additional_td_median": 11630107452,
+  "additional_td_p10": 11524625690,
+  "additional_td_p90": 11750629434,
+  "projected_seconds_median": 22943.0,
+  "ttd": "7288681830821503",
+  "limitations": "Conditional constant-hash-power model; no height/time guarantee. Not a beacon readiness check."
+}

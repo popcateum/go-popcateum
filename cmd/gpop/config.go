@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -20,37 +20,43 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"reflect"
 	"unicode"
 
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 
+	"github.com/naoina/toml"
+	"github.com/popcateum/go-popcateum/accounts/external"
+	"github.com/popcateum/go-popcateum/accounts/keystore"
+	"github.com/popcateum/go-popcateum/accounts/scwallet"
+	"github.com/popcateum/go-popcateum/accounts/usbwallet"
 	"github.com/popcateum/go-popcateum/cmd/utils"
-	"github.com/popcateum/go-popcateum/eth/catalyst"
+	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/eth/ethconfig"
 	"github.com/popcateum/go-popcateum/internal/ethapi"
+	"github.com/popcateum/go-popcateum/internal/flags"
+	"github.com/popcateum/go-popcateum/internal/version"
+	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/metrics"
 	"github.com/popcateum/go-popcateum/node"
 	"github.com/popcateum/go-popcateum/params"
-	"github.com/naoina/toml"
 )
 
 var (
-	dumpConfigCommand = cli.Command{
-		Action:      utils.MigrateFlags(dumpConfig),
+	dumpConfigCommand = &cli.Command{
+		Action:      dumpConfig,
 		Name:        "dumpconfig",
-		Usage:       "Show configuration values",
-		ArgsUsage:   "",
-		Flags:       append(nodeFlags, rpcFlags...),
-		Category:    "MISCELLANEOUS COMMANDS",
-		Description: `The dumpconfig command shows configuration values.`,
+		Usage:       "Export configuration values in a TOML format",
+		ArgsUsage:   "<dumpfile (optional)>",
+		Flags:       flags.Merge(nodeFlags, rpcFlags),
+		Description: `Export configuration values in TOML format (to stdout by default).`,
 	}
 
-	configFileFlag = cli.StringFlag{
-		Name:  "config",
-		Usage: "TOML configuration file",
+	configFileFlag = &cli.StringFlag{
+		Name:     "config",
+		Usage:    "TOML configuration file",
+		Category: flags.EthCategory,
 	}
 )
 
@@ -63,7 +69,12 @@ var tomlSettings = toml.Config{
 		return field
 	},
 	MissingField: func(rt reflect.Type, field string) error {
-		link := ""
+		id := fmt.Sprintf("%s.%s", rt.String(), field)
+		if deprecated(id) {
+			log.Warn("Config field is deprecated and won't have an effect", "name", id)
+			return nil
+		}
+		var link string
 		if unicode.IsUpper(rune(rt.Name()[0])) && rt.PkgPath() != "main" {
 			link = fmt.Sprintf(", see https://godoc.org/%s#%s for available fields", rt.PkgPath(), rt.Name())
 		}
@@ -75,14 +86,14 @@ type ethstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type gpopConfig struct {
+type gethConfig struct {
 	Eth      ethconfig.Config
 	Node     node.Config
 	Ethstats ethstatsConfig
 	Metrics  metrics.Config
 }
 
-func loadConfig(file string, cfg *gpopConfig) error {
+func loadConfig(file string, cfg *gethConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -98,26 +109,27 @@ func loadConfig(file string, cfg *gpopConfig) error {
 }
 
 func defaultNodeConfig() node.Config {
+	git, _ := version.VCS()
 	cfg := node.DefaultConfig
 	cfg.Name = clientIdentifier
-	cfg.Version = params.VersionWithCommit(gitCommit, gitDate)
+	cfg.Version = params.VersionWithCommit(git.Commit, git.Date)
 	cfg.HTTPModules = append(cfg.HTTPModules, "eth")
 	cfg.WSModules = append(cfg.WSModules, "eth")
 	cfg.IPCPath = "gpop.ipc"
 	return cfg
 }
 
-// makeConfigNode loads gpop configuration and creates a blank node instance.
-func makeConfigNode(ctx *cli.Context) (*node.Node, gpopConfig) {
+// makeConfigNode loads geth configuration and creates a blank node instance.
+func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	// Load defaults.
-	cfg := gpopConfig{
+	cfg := gethConfig{
 		Eth:     ethconfig.Defaults,
 		Node:    defaultNodeConfig(),
 		Metrics: metrics.DefaultConfig,
 	}
 
 	// Load config file.
-	if file := ctx.GlobalString(configFileFlag.Name); file != "" {
+	if file := ctx.String(configFileFlag.Name); file != "" {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
@@ -129,40 +141,45 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gpopConfig) {
 	if err != nil {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
+	// Node doesn't by default populate account manager backends
+	if err := setAccountManagerBackends(stack); err != nil {
+		utils.Fatalf("Failed to set account manager backends: %v", err)
+	}
+
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
-	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
+	if ctx.IsSet(utils.EthStatsURLFlag.Name) {
+		cfg.Ethstats.URL = ctx.String(utils.EthStatsURLFlag.Name)
 	}
 	applyMetricConfig(ctx, &cfg)
 
 	return stack, cfg
 }
 
-// makeFullNode loads gpop configuration and creates the Popcateum backend.
+// makeFullNode loads geth configuration and creates the Ethereum backend.
 func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	stack, cfg := makeConfigNode(ctx)
-	if ctx.GlobalIsSet(utils.OverrideBerlinFlag.Name) {
-		cfg.Eth.OverrideBerlin = new(big.Int).SetUint64(ctx.GlobalUint64(utils.OverrideBerlinFlag.Name))
+	if ctx.IsSet(utils.OverrideShanghai.Name) {
+		v := ctx.Uint64(utils.OverrideShanghai.Name)
+		cfg.Eth.OverrideShanghai = &v
 	}
 	backend, eth := utils.RegisterEthService(stack, &cfg.Eth)
 
-	// Configure catalyst.
-	if ctx.GlobalBool(utils.CatalystFlag.Name) {
-		if eth == nil {
-			utils.Fatalf("Catalyst does not work in light client mode.")
-		}
-		if err := catalyst.Register(stack, eth); err != nil {
-			utils.Fatalf("%v", err)
-		}
+	// Configure log filter RPC API.
+	filterSystem := utils.RegisterFilterAPI(stack, backend, &cfg.Eth)
+
+	// Configure GraphQL if requested.
+	if ctx.IsSet(utils.GraphQLEnabledFlag.Name) {
+		utils.RegisterGraphQLService(stack, backend, filterSystem, &cfg.Node)
 	}
 
-	// Configure GraphQL if requested
-	if ctx.GlobalIsSet(utils.GraphQLEnabledFlag.Name) {
-		utils.RegisterGraphQLService(stack, backend, cfg.Node)
-	}
-	// Add the Popcateum Stats daemon if requested.
+	// Add the Ethereum Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
+	}
+
+	// Configure full-sync tester service if requested
+	if ctx.IsSet(utils.SyncTargetFlag.Name) && cfg.Eth.SyncMode == downloader.FullSync {
+		utils.RegisterFullSyncTester(stack, eth, ctx.Path(utils.SyncTargetFlag.Name))
 	}
 	return stack, backend
 }
@@ -196,35 +213,117 @@ func dumpConfig(ctx *cli.Context) error {
 	return nil
 }
 
-func applyMetricConfig(ctx *cli.Context, cfg *gpopConfig) {
-	if ctx.GlobalIsSet(utils.MetricsEnabledFlag.Name) {
-		cfg.Metrics.Enabled = ctx.GlobalBool(utils.MetricsEnabledFlag.Name)
+func applyMetricConfig(ctx *cli.Context, cfg *gethConfig) {
+	if ctx.IsSet(utils.MetricsEnabledFlag.Name) {
+		cfg.Metrics.Enabled = ctx.Bool(utils.MetricsEnabledFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsEnabledExpensiveFlag.Name) {
-		cfg.Metrics.EnabledExpensive = ctx.GlobalBool(utils.MetricsEnabledExpensiveFlag.Name)
+	if ctx.IsSet(utils.MetricsEnabledExpensiveFlag.Name) {
+		cfg.Metrics.EnabledExpensive = ctx.Bool(utils.MetricsEnabledExpensiveFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsHTTPFlag.Name) {
-		cfg.Metrics.HTTP = ctx.GlobalString(utils.MetricsHTTPFlag.Name)
+	if ctx.IsSet(utils.MetricsHTTPFlag.Name) {
+		cfg.Metrics.HTTP = ctx.String(utils.MetricsHTTPFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsPortFlag.Name) {
-		cfg.Metrics.Port = ctx.GlobalInt(utils.MetricsPortFlag.Name)
+	if ctx.IsSet(utils.MetricsPortFlag.Name) {
+		cfg.Metrics.Port = ctx.Int(utils.MetricsPortFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsEnableInfluxDBFlag.Name) {
-		cfg.Metrics.EnableInfluxDB = ctx.GlobalBool(utils.MetricsEnableInfluxDBFlag.Name)
+	if ctx.IsSet(utils.MetricsEnableInfluxDBFlag.Name) {
+		cfg.Metrics.EnableInfluxDB = ctx.Bool(utils.MetricsEnableInfluxDBFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsInfluxDBEndpointFlag.Name) {
-		cfg.Metrics.InfluxDBEndpoint = ctx.GlobalString(utils.MetricsInfluxDBEndpointFlag.Name)
+	if ctx.IsSet(utils.MetricsInfluxDBEndpointFlag.Name) {
+		cfg.Metrics.InfluxDBEndpoint = ctx.String(utils.MetricsInfluxDBEndpointFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsInfluxDBDatabaseFlag.Name) {
-		cfg.Metrics.InfluxDBDatabase = ctx.GlobalString(utils.MetricsInfluxDBDatabaseFlag.Name)
+	if ctx.IsSet(utils.MetricsInfluxDBDatabaseFlag.Name) {
+		cfg.Metrics.InfluxDBDatabase = ctx.String(utils.MetricsInfluxDBDatabaseFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsInfluxDBUsernameFlag.Name) {
-		cfg.Metrics.InfluxDBUsername = ctx.GlobalString(utils.MetricsInfluxDBUsernameFlag.Name)
+	if ctx.IsSet(utils.MetricsInfluxDBUsernameFlag.Name) {
+		cfg.Metrics.InfluxDBUsername = ctx.String(utils.MetricsInfluxDBUsernameFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsInfluxDBPasswordFlag.Name) {
-		cfg.Metrics.InfluxDBPassword = ctx.GlobalString(utils.MetricsInfluxDBPasswordFlag.Name)
+	if ctx.IsSet(utils.MetricsInfluxDBPasswordFlag.Name) {
+		cfg.Metrics.InfluxDBPassword = ctx.String(utils.MetricsInfluxDBPasswordFlag.Name)
 	}
-	if ctx.GlobalIsSet(utils.MetricsInfluxDBTagsFlag.Name) {
-		cfg.Metrics.InfluxDBTags = ctx.GlobalString(utils.MetricsInfluxDBTagsFlag.Name)
+	if ctx.IsSet(utils.MetricsInfluxDBTagsFlag.Name) {
+		cfg.Metrics.InfluxDBTags = ctx.String(utils.MetricsInfluxDBTagsFlag.Name)
 	}
+	if ctx.IsSet(utils.MetricsEnableInfluxDBV2Flag.Name) {
+		cfg.Metrics.EnableInfluxDBV2 = ctx.Bool(utils.MetricsEnableInfluxDBV2Flag.Name)
+	}
+	if ctx.IsSet(utils.MetricsInfluxDBTokenFlag.Name) {
+		cfg.Metrics.InfluxDBToken = ctx.String(utils.MetricsInfluxDBTokenFlag.Name)
+	}
+	if ctx.IsSet(utils.MetricsInfluxDBBucketFlag.Name) {
+		cfg.Metrics.InfluxDBBucket = ctx.String(utils.MetricsInfluxDBBucketFlag.Name)
+	}
+	if ctx.IsSet(utils.MetricsInfluxDBOrganizationFlag.Name) {
+		cfg.Metrics.InfluxDBOrganization = ctx.String(utils.MetricsInfluxDBOrganizationFlag.Name)
+	}
+}
+
+func deprecated(field string) bool {
+	switch field {
+	case "ethconfig.Config.EVMInterpreter":
+		return true
+	case "ethconfig.Config.EWASMInterpreter":
+		return true
+	default:
+		return false
+	}
+}
+
+func setAccountManagerBackends(stack *node.Node) error {
+	conf := stack.Config()
+	am := stack.AccountManager()
+	keydir := stack.KeyStoreDir()
+	scryptN := keystore.StandardScryptN
+	scryptP := keystore.StandardScryptP
+	if conf.UseLightweightKDF {
+		scryptN = keystore.LightScryptN
+		scryptP = keystore.LightScryptP
+	}
+
+	// Assemble the supported backends
+	if len(conf.ExternalSigner) > 0 {
+		log.Info("Using external signer", "url", conf.ExternalSigner)
+		if extapi, err := external.NewExternalBackend(conf.ExternalSigner); err == nil {
+			am.AddBackend(extapi)
+			return nil
+		} else {
+			return fmt.Errorf("error connecting to external signer: %v", err)
+		}
+	}
+
+	// For now, we're using EITHER external signer OR local signers.
+	// If/when we implement some form of lockfile for USB and keystore wallets,
+	// we can have both, but it's very confusing for the user to see the same
+	// accounts in both externally and locally, plus very racey.
+	am.AddBackend(keystore.NewKeyStore(keydir, scryptN, scryptP))
+	if conf.USB {
+		// Start a USB hub for Ledger hardware wallets
+		if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
+			log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
+		} else {
+			am.AddBackend(ledgerhub)
+		}
+		// Start a USB hub for Trezor hardware wallets (HID version)
+		if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
+			log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
+		} else {
+			am.AddBackend(trezorhub)
+		}
+		// Start a USB hub for Trezor hardware wallets (WebUSB version)
+		if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
+			log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
+		} else {
+			am.AddBackend(trezorhub)
+		}
+	}
+	if len(conf.SmartCardDaemonPath) > 0 {
+		// Start a smart card hub
+		if schub, err := scwallet.NewHub(conf.SmartCardDaemonPath, scwallet.Scheme, keydir); err != nil {
+			log.Warn(fmt.Sprintf("Failed to start smart card hub, disabling: %v", err))
+		} else {
+			am.AddBackend(schub)
+		}
+	}
+
+	return nil
 }

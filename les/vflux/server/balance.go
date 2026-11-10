@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package server
 
@@ -356,7 +356,7 @@ func (n *nodeBalance) estimatePriority(capacity uint64, addBalance int64, future
 		b = n.reducedBalance(b, now, future, capacity, avgReqCost)
 	}
 	if bias > 0 {
-		b = n.reducedBalance(b, now+mclock.AbsTime(future), bias, capacity, 0)
+		b = n.reducedBalance(b, now.Add(future), bias, capacity, 0)
 	}
 	pri := n.balanceToPriority(now, b, capacity)
 	// Ensure that biased estimates are always lower than actual priorities, even if
@@ -512,7 +512,7 @@ func (n *nodeBalance) scheduleCheck(now mclock.AbsTime) {
 			n.updateAfter(0)
 			return
 		}
-		if n.nextUpdate == 0 || n.nextUpdate > now+mclock.AbsTime(d) {
+		if n.nextUpdate == 0 || n.nextUpdate > now.Add(d) {
 			if d > time.Second {
 				// Note: if the scheduled update is not in the very near future then we
 				// schedule the update a bit earlier. This way we do need to update a few
@@ -520,7 +520,7 @@ func (n *nodeBalance) scheduleCheck(now mclock.AbsTime) {
 				// brings the expected firing time a little bit closer.
 				d = ((d - time.Second) * 7 / 8) + time.Second
 			}
-			n.nextUpdate = now + mclock.AbsTime(d)
+			n.nextUpdate = now.Add(d)
 			n.updateAfter(d)
 		}
 	} else {
@@ -623,13 +623,13 @@ func (n *nodeBalance) priorityToBalance(priority int64, capacity uint64) (uint64
 	return 0, uint64(-priority)
 }
 
-// reducedBalance estimates the reduced balance at a given time in the fututre based
+// reducedBalance estimates the reduced balance at a given time in the future based
 // on the given balance, the time factor and an estimated average request cost per time ratio
 func (n *nodeBalance) reducedBalance(b balance, start mclock.AbsTime, dt time.Duration, capacity uint64, avgReqCost float64) balance {
 	// since the costs are applied continuously during the dt time period we calculate
 	// the expiration offset at the middle of the period
 	var (
-		at  = start + mclock.AbsTime(dt/2)
+		at  = start.Add(dt / 2)
 		dtf = float64(dt)
 	)
 	if !b.pos.IsZero() {

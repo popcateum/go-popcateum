@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package asm
 
@@ -68,10 +68,10 @@ func (it tokenType) String() string {
 
 var stringtokenTypes = []string{
 	eof:              "EOF",
+	lineStart:        "new line",
+	lineEnd:          "end of line",
 	invalidStatement: "invalid statement",
 	element:          "element",
-	lineEnd:          "end of line",
-	lineStart:        "new line",
 	label:            "label",
 	labelDef:         "label definition",
 	number:           "number",
@@ -93,7 +93,7 @@ type lexer struct {
 	debug bool // flag for triggering debug output
 }
 
-// lex lexes the program by name with the given source. It returns a
+// Lex lexes the program by name with the given source. It returns a
 // channel on which the tokens are delivered.
 func Lex(source []byte, debug bool) <-chan token {
 	ch := make(chan token)
@@ -254,7 +254,7 @@ func lexInsideString(l *lexer) stateFn {
 
 func lexNumber(l *lexer) stateFn {
 	acceptance := Numbers
-	if l.accept("0") || l.accept("xX") {
+	if l.accept("xX") {
 		acceptance = HexadecimalNumbers
 	}
 	l.acceptRun(acceptance)

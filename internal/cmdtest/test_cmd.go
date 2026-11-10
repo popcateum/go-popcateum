@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package cmdtest
 
@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -59,7 +58,7 @@ type TestCmd struct {
 var id int32
 
 // Run exec's the current binary using name as argv[0] which will trigger the
-// reexec init function for that name (e.g. "gpop-test" in cmd/gpop/run_test.go)
+// reexec init function for that name (e.g. "geth-test" in cmd/geth/run_test.go)
 func (tt *TestCmd) Run(name string, args ...string) {
 	id := atomic.AddInt32(&id, 1)
 	tt.stderr = &testlogger{t: tt.T, name: fmt.Sprintf("%d", id)}
@@ -84,7 +83,7 @@ func (tt *TestCmd) Run(name string, args ...string) {
 // InputLine writes the given text to the child's stdin.
 // This method can also be called from an expect template, e.g.:
 //
-//     gpop.expect(`Passphrase: {{.InputLine "password"}}`)
+//	geth.expect(`Passphrase: {{.InputLine "password"}}`)
 func (tt *TestCmd) InputLine(s string) string {
 	io.WriteString(tt.stdin, s+"\n")
 	return ""
@@ -116,6 +115,13 @@ func (tt *TestCmd) Expect(tplsource string) {
 		tt.Fatal(err)
 	}
 	tt.Logf("Matched stdout text:\n%s", want)
+}
+
+// Output reads all output from stdout, and returns the data.
+func (tt *TestCmd) Output() []byte {
+	var buf []byte
+	tt.withKillTimeout(func() { buf, _ = io.ReadAll(tt.stdout) })
+	return buf
 }
 
 func (tt *TestCmd) matchExactOutput(want []byte) error {
@@ -177,7 +183,7 @@ func (tt *TestCmd) ExpectRegexp(regex string) (*regexp.Regexp, []string) {
 func (tt *TestCmd) ExpectExit() {
 	var output []byte
 	tt.withKillTimeout(func() {
-		output, _ = ioutil.ReadAll(tt.stdout)
+		output, _ = io.ReadAll(tt.stdout)
 	})
 	tt.WaitExit()
 	if tt.Cleanup != nil {

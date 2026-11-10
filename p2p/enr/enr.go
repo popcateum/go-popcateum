@@ -1,25 +1,25 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package enr implements Popcateum Node Records as defined in EIP-778. A node record holds
+// Package enr implements Ethereum Node Records as defined in EIP-778. A node record holds
 // arbitrary information about a node on the peer-to-peer network. Node information is
 // stored in key/value pairs. To store and retrieve key/values in a record, use the Entry
 // interface.
 //
-// Signature Handling
+// # Signature Handling
 //
 // Records must be signed before transmitting them to another node.
 //
@@ -94,6 +94,24 @@ type Record struct {
 type pair struct {
 	k string
 	v rlp.RawValue
+}
+
+// Size returns the encoded size of the record.
+func (r *Record) Size() uint64 {
+	if r.raw != nil {
+		return uint64(len(r.raw))
+	}
+	return computeSize(r)
+}
+
+func computeSize(r *Record) uint64 {
+	size := uint64(rlp.IntSize(r.seq))
+	size += rlp.BytesSize(r.signature)
+	for _, p := range r.pairs {
+		size += rlp.StringSize(p.k)
+		size += uint64(len(p.v))
+	}
+	return rlp.ListSize(size)
 }
 
 // Seq returns the sequence number.
@@ -304,7 +322,7 @@ func (r *Record) AppendElements(list []interface{}) []interface{} {
 }
 
 func (r *Record) encode(sig []byte) (raw []byte, err error) {
-	list := make([]interface{}, 1, 2*len(r.pairs)+1)
+	list := make([]interface{}, 1, 2*len(r.pairs)+2)
 	list[0] = sig
 	list = r.AppendElements(list)
 	if raw, err = rlp.EncodeToBytes(list); err != nil {

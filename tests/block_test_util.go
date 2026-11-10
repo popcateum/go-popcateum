@@ -1,20 +1,20 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package tests implements execution of Popcateum JSON tests.
+// Package tests implements execution of Ethereum JSON tests.
 package tests
 
 import (
@@ -23,11 +23,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
+	"reflect"
 
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/hexutil"
 	"github.com/popcateum/go-popcateum/common/math"
 	"github.com/popcateum/go-popcateum/consensus"
+	"github.com/popcateum/go-popcateum/consensus/beacon"
 	"github.com/popcateum/go-popcateum/consensus/ethash"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
@@ -59,12 +62,13 @@ type btJSON struct {
 }
 
 type btBlock struct {
-	BlockHeader  *btHeader
-	Rlp          string
-	UncleHeaders []*btHeader
+	BlockHeader     *btHeader
+	ExpectException string
+	Rlp             string
+	UncleHeaders    []*btHeader
 }
 
-//go:generate gencodec -type btHeader -field-override btHeaderMarshaling -out gen_btheader.go
+//go:generate go run github.com/fjl/gencodec -type btHeader -field-override btHeaderMarshaling -out gen_btheader.go
 
 type btHeader struct {
 	Bloom            types.Bloom
@@ -83,15 +87,18 @@ type btHeader struct {
 	GasLimit         uint64
 	GasUsed          uint64
 	Timestamp        uint64
+	BaseFeePerGas    *big.Int
+	WithdrawalsRoot  *common.Hash
 }
 
 type btHeaderMarshaling struct {
-	ExtraData  hexutil.Bytes
-	Number     *math.HexOrDecimal256
-	Difficulty *math.HexOrDecimal256
-	GasLimit   math.HexOrDecimal64
-	GasUsed    math.HexOrDecimal64
-	Timestamp  math.HexOrDecimal64
+	ExtraData     hexutil.Bytes
+	Number        *math.HexOrDecimal256
+	Difficulty    *math.HexOrDecimal256
+	GasLimit      math.HexOrDecimal64
+	GasUsed       math.HexOrDecimal64
+	Timestamp     math.HexOrDecimal64
+	BaseFeePerGas *math.HexOrDecimal256
 }
 
 func (t *BlockTest) Run(snapshotter bool) error {
@@ -102,10 +109,8 @@ func (t *BlockTest) Run(snapshotter bool) error {
 
 	// import pre accounts & construct test genesis block & state root
 	db := rawdb.NewMemoryDatabase()
-	gblock, err := t.genesis(config).Commit(db)
-	if err != nil {
-		return err
-	}
+	gspec := t.genesis(config)
+	gblock := gspec.MustCommit(db)
 	if gblock.Hash() != t.json.Genesis.Hash {
 		return fmt.Errorf("genesis block hash doesn't match test: computed=%x, test=%x", gblock.Hash().Bytes()[:6], t.json.Genesis.Hash[:6])
 	}
@@ -118,12 +123,15 @@ func (t *BlockTest) Run(snapshotter bool) error {
 	} else {
 		engine = ethash.NewShared()
 	}
+	// Wrap the original engine within the beacon-engine
+	engine = beacon.New(engine)
+
 	cache := &core.CacheConfig{TrieCleanLimit: 0}
 	if snapshotter {
 		cache.SnapshotLimit = 1
 		cache.SnapshotWait = true
 	}
-	chain, err := core.NewBlockChain(db, cache, config, engine, vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, cache, gspec, nil, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -146,7 +154,7 @@ func (t *BlockTest) Run(snapshotter bool) error {
 	}
 	// Cross-check the snapshot-to-hash against the trie hash
 	if snapshotter {
-		if err := chain.Snapshots().Verify(chain.CurrentBlock().Root()); err != nil {
+		if err := chain.Snapshots().Verify(chain.CurrentBlock().Root); err != nil {
 			return err
 		}
 	}
@@ -166,25 +174,27 @@ func (t *BlockTest) genesis(config *params.ChainConfig) *core.Genesis {
 		Mixhash:    t.json.Genesis.MixHash,
 		Coinbase:   t.json.Genesis.Coinbase,
 		Alloc:      t.json.Pre,
+		BaseFee:    t.json.Genesis.BaseFeePerGas,
 	}
 }
 
-/* See https://github.com/popcateum/tests/wiki/Blockchain-Tests-II
+/*
+See https://github.com/ethereum/tests/wiki/Blockchain-Tests-II
 
-   Whether a block is valid or not is a bit subtle, it's defined by presence of
-   blockHeader, transactions and uncleHeaders fields. If they are missing, the block is
-   invalid and we must verify that we do not accept it.
+	Whether a block is valid or not is a bit subtle, it's defined by presence of
+	blockHeader, transactions and uncleHeaders fields. If they are missing, the block is
+	invalid and we must verify that we do not accept it.
 
-   Since some tests mix valid and invalid blocks we need to check this for every block.
+	Since some tests mix valid and invalid blocks we need to check this for every block.
 
-   If a block is invalid it does not necessarily fail the test, if it's invalidness is
-   expected we are expected to ignore it and continue processing and then validate the
-   post state.
+	If a block is invalid it does not necessarily fail the test, if it's invalidness is
+	expected we are expected to ignore it and continue processing and then validate the
+	post state.
 */
 func (t *BlockTest) insertBlocks(blockchain *core.BlockChain) ([]btBlock, error) {
 	validBlocks := make([]btBlock, 0)
 	// insert the test blocks, which will execute all transactions
-	for _, b := range t.json.Blocks {
+	for bi, b := range t.json.Blocks {
 		cb, err := b.decode()
 		if err != nil {
 			if b.BlockHeader == nil {
@@ -204,7 +214,12 @@ func (t *BlockTest) insertBlocks(blockchain *core.BlockChain) ([]btBlock, error)
 			}
 		}
 		if b.BlockHeader == nil {
-			return nil, fmt.Errorf("block insertion should have failed")
+			if data, err := json.MarshalIndent(cb.Header(), "", "  "); err == nil {
+				fmt.Fprintf(os.Stderr, "block (index %d) insertion should have failed due to: %v:\n%v\n",
+					bi, b.ExpectException, string(data))
+			}
+			return nil, fmt.Errorf("block (index %d) insertion should have failed due to: %v",
+				bi, b.ExpectException)
 		}
 
 		// validate RLP decoding by checking all values against test file JSON
@@ -262,6 +277,12 @@ func validateHeader(h *btHeader, h2 *types.Header) error {
 	if h.Timestamp != h2.Time {
 		return fmt.Errorf("timestamp: want: %v have: %v", h.Timestamp, h2.Time)
 	}
+	if !reflect.DeepEqual(h.BaseFeePerGas, h2.BaseFee) {
+		return fmt.Errorf("baseFeePerGas: want: %v have: %v", h.BaseFeePerGas, h2.BaseFee)
+	}
+	if !reflect.DeepEqual(h.WithdrawalsRoot, h2.WithdrawalsHash) {
+		return fmt.Errorf("withdrawalsRoot: want: %v have: %v", h.WithdrawalsRoot, h2.WithdrawalsHash)
+	}
 	return nil
 }
 
@@ -296,8 +317,8 @@ func (t *BlockTest) validateImportedHeaders(cm *core.BlockChain, validBlocks []b
 	// block-by-block, so we can only validate imported headers after
 	// all blocks have been processed by BlockChain, as they may not
 	// be part of the longest chain until last block is imported.
-	for b := cm.CurrentBlock(); b != nil && b.NumberU64() != 0; b = cm.GetBlockByHash(b.Header().ParentHash) {
-		if err := validateHeader(bmap[b.Hash()].BlockHeader, b.Header()); err != nil {
+	for b := cm.CurrentBlock(); b != nil && b.Number.Uint64() != 0; b = cm.GetBlockByHash(b.ParentHash).Header() {
+		if err := validateHeader(bmap[b.Hash()].BlockHeader, b); err != nil {
 			return fmt.Errorf("imported block header validation failed: %v", err)
 		}
 	}

@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // This file contains some shares testing functionality, common to  multiple
 // different files and modules being tested.
@@ -21,7 +21,9 @@ package eth
 
 import (
 	"crypto/rand"
+	"testing"
 
+	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/p2p"
 	"github.com/popcateum/go-popcateum/p2p/enode"
 )
@@ -46,6 +48,8 @@ func newTestPeer(name string, version uint, backend Backend) (*testPeer, <-chan 
 	peer := NewPeer(version, p2p.NewPeer(id, name, nil), net, backend.TxPool())
 	errc := make(chan error, 1)
 	go func() {
+		defer app.Close()
+
 		errc <- backend.RunPeer(peer, func(peer *Peer) error {
 			return Handle(backend, peer)
 		})
@@ -58,4 +62,29 @@ func newTestPeer(name string, version uint, backend Backend) (*testPeer, <-chan 
 func (p *testPeer) close() {
 	p.Peer.Close()
 	p.app.Close()
+}
+
+func TestPeerSet(t *testing.T) {
+	size := 5
+	s := newKnownCache(size)
+
+	// add 10 items
+	for i := 0; i < size*2; i++ {
+		s.Add(common.Hash{byte(i)})
+	}
+
+	if s.Cardinality() != size {
+		t.Fatalf("wrong size, expected %d but found %d", size, s.Cardinality())
+	}
+
+	vals := []common.Hash{}
+	for i := 10; i < 20; i++ {
+		vals = append(vals, common.Hash{byte(i)})
+	}
+
+	// add item in batch
+	s.Add(vals...)
+	if s.Cardinality() < size {
+		t.Fatalf("bad size")
+	}
 }

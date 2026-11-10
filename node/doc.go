@@ -1,45 +1,42 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 /*
-Package node sets up multi-protocol Popcateum nodes.
+Package node sets up multi-protocol Ethereum nodes.
 
 In the model exposed by this package, a node is a collection of services which use shared
 resources to provide RPC APIs. Services can also offer devp2p protocols, which are wired
 up to the devp2p network when the node instance is started.
 
-
-Node Lifecycle
+# Node Lifecycle
 
 The Node object has a lifecycle consisting of three basic states, INITIALIZING, RUNNING
 and CLOSED.
 
-
-    ●───────┐
-         New()
-            │
-            ▼
-      INITIALIZING ────Start()─┐
-            │                  │
-            │                  ▼
-        Close()             RUNNING
-            │                  │
-            ▼                  │
-         CLOSED ◀──────Close()─┘
-
+	●───────┐
+	     New()
+	        │
+	        ▼
+	  INITIALIZING ────Start()─┐
+	        │                  │
+	        │                  ▼
+	    Close()             RUNNING
+	        │                  │
+	        ▼                  │
+	     CLOSED ◀──────Close()─┘
 
 Creating a Node allocates basic resources such as the data directory and returns the node
 in its INITIALIZING state. Lifecycle objects, RPC APIs and peer-to-peer networking
@@ -58,8 +55,7 @@ objects and shuts down RPC and peer-to-peer networking.
 
 You must always call Close on Node, even if the node was not started.
 
-
-Resources Managed By Node
+# Resources Managed By Node
 
 All file-system resources used by a node instance are located in a directory called the
 data directory. The location of each resource can be overridden through additional node
@@ -80,11 +76,10 @@ Service implementations can open LevelDB databases through the service context. 
 node chooses the file system location of each database. If the node is configured to run
 without a data directory, databases are opened in memory instead.
 
-Node also creates the shared store of encrypted Popcateum account keys. Services can access
+Node also creates the shared store of encrypted Ethereum account keys. Services can access
 the account manager through the service context.
 
-
-Sharing Data Directory Among Instances
+# Sharing Data Directory Among Instances
 
 Multiple node instances can share a single data directory if they have distinct instance
 names (set through the Name config option). Sharing behaviour depends on the type of
@@ -102,26 +97,25 @@ create one database for each instance.
 The account key store is shared among all node instances using the same data directory
 unless its location is changed through the KeyStoreDir configuration option.
 
-
-Data Directory Sharing Example
+# Data Directory Sharing Example
 
 In this example, two node instances named A and B are started with the same data
 directory. Node instance A opens the database "db", node instance B opens the databases
 "db" and "db-2". The following files will be created in the data directory:
 
-   data-directory/
-        A/
-            nodekey            -- devp2p node key of instance A
-            nodes/             -- devp2p discovery knowledge database of instance A
-            db/                -- LevelDB content for "db"
-        A.ipc                  -- JSON-RPC UNIX domain socket endpoint of instance A
-        B/
-            nodekey            -- devp2p node key of node B
-            nodes/             -- devp2p discovery knowledge database of instance B
-            static-nodes.json  -- devp2p static node list of instance B
-            db/                -- LevelDB content for "db"
-            db-2/              -- LevelDB content for "db-2"
-        B.ipc                  -- JSON-RPC UNIX domain socket endpoint of instance B
-        keystore/              -- account key store, used by both instances
+	data-directory/
+		A/
+			nodekey            -- devp2p node key of instance A
+			nodes/             -- devp2p discovery knowledge database of instance A
+			db/                -- LevelDB content for "db"
+		A.ipc                  -- JSON-RPC UNIX domain socket endpoint of instance A
+		B/
+			nodekey            -- devp2p node key of node B
+			nodes/             -- devp2p discovery knowledge database of instance B
+			static-nodes.json  -- devp2p static node list of instance B
+			db/                -- LevelDB content for "db"
+			db-2/              -- LevelDB content for "db-2"
+		B.ipc                  -- JSON-RPC UNIX domain socket endpoint of instance B
+		keystore/              -- account key store, used by both instances
 */
 package node

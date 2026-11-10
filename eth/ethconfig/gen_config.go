@@ -8,6 +8,7 @@ import (
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/consensus/ethash"
 	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/eth/gasprice"
 	"github.com/popcateum/go-popcateum/miner"
@@ -25,7 +26,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NoPruning               bool
 		NoPrefetch              bool
 		TxLookupLimit           uint64                 `toml:",omitempty"`
-		Whitelist               map[uint64]common.Hash `toml:"-"`
+		RequiredBlocks          map[uint64]common.Hash `toml:"-"`
 		LightServ               int                    `toml:",omitempty"`
 		LightIngress            int                    `toml:",omitempty"`
 		LightEgress             int                    `toml:",omitempty"`
@@ -47,18 +48,19 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		TrieTimeout             time.Duration
 		SnapshotCache           int
 		Preimages               bool
+		FilterLogCacheSize      int
 		Miner                   miner.Config
 		Ethash                  ethash.Config
-		TxPool                  core.TxPoolConfig
+		TxPool                  txpool.Config
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
 		DocRoot                 string `toml:"-"`
-		EWASMInterpreter        string
-		EVMInterpreter          string
-		RPCGasCap               uint64                         `toml:",omitempty"`
-		RPCTxFeeCap             float64                        `toml:",omitempty"`
+		RPCGasCap               uint64
+		RPCEVMTimeout           time.Duration
+		RPCTxFeeCap             float64
 		Checkpoint              *params.TrustedCheckpoint      `toml:",omitempty"`
 		CheckpointOracle        *params.CheckpointOracleConfig `toml:",omitempty"`
+		OverrideShanghai        *uint64                        `toml:",omitempty"`
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
@@ -69,7 +71,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.NoPruning = c.NoPruning
 	enc.NoPrefetch = c.NoPrefetch
 	enc.TxLookupLimit = c.TxLookupLimit
-	enc.Whitelist = c.Whitelist
+	enc.RequiredBlocks = c.RequiredBlocks
 	enc.LightServ = c.LightServ
 	enc.LightIngress = c.LightIngress
 	enc.LightEgress = c.LightEgress
@@ -91,18 +93,19 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.TrieTimeout = c.TrieTimeout
 	enc.SnapshotCache = c.SnapshotCache
 	enc.Preimages = c.Preimages
+	enc.FilterLogCacheSize = c.FilterLogCacheSize
 	enc.Miner = c.Miner
 	enc.Ethash = c.Ethash
 	enc.TxPool = c.TxPool
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.DocRoot = c.DocRoot
-	enc.EWASMInterpreter = c.EWASMInterpreter
-	enc.EVMInterpreter = c.EVMInterpreter
 	enc.RPCGasCap = c.RPCGasCap
+	enc.RPCEVMTimeout = c.RPCEVMTimeout
 	enc.RPCTxFeeCap = c.RPCTxFeeCap
 	enc.Checkpoint = c.Checkpoint
 	enc.CheckpointOracle = c.CheckpointOracle
+	enc.OverrideShanghai = c.OverrideShanghai
 	return &enc, nil
 }
 
@@ -117,7 +120,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NoPruning               *bool
 		NoPrefetch              *bool
 		TxLookupLimit           *uint64                `toml:",omitempty"`
-		Whitelist               map[uint64]common.Hash `toml:"-"`
+		RequiredBlocks          map[uint64]common.Hash `toml:"-"`
 		LightServ               *int                   `toml:",omitempty"`
 		LightIngress            *int                   `toml:",omitempty"`
 		LightEgress             *int                   `toml:",omitempty"`
@@ -139,18 +142,19 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		TrieTimeout             *time.Duration
 		SnapshotCache           *int
 		Preimages               *bool
+		FilterLogCacheSize      *int
 		Miner                   *miner.Config
 		Ethash                  *ethash.Config
-		TxPool                  *core.TxPoolConfig
+		TxPool                  *txpool.Config
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
 		DocRoot                 *string `toml:"-"`
-		EWASMInterpreter        *string
-		EVMInterpreter          *string
-		RPCGasCap               *uint64                        `toml:",omitempty"`
-		RPCTxFeeCap             *float64                       `toml:",omitempty"`
+		RPCGasCap               *uint64
+		RPCEVMTimeout           *time.Duration
+		RPCTxFeeCap             *float64
 		Checkpoint              *params.TrustedCheckpoint      `toml:",omitempty"`
 		CheckpointOracle        *params.CheckpointOracleConfig `toml:",omitempty"`
+		OverrideShanghai        *uint64                        `toml:",omitempty"`
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
@@ -180,8 +184,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.TxLookupLimit != nil {
 		c.TxLookupLimit = *dec.TxLookupLimit
 	}
-	if dec.Whitelist != nil {
-		c.Whitelist = dec.Whitelist
+	if dec.RequiredBlocks != nil {
+		c.RequiredBlocks = dec.RequiredBlocks
 	}
 	if dec.LightServ != nil {
 		c.LightServ = *dec.LightServ
@@ -246,6 +250,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.Preimages != nil {
 		c.Preimages = *dec.Preimages
 	}
+	if dec.FilterLogCacheSize != nil {
+		c.FilterLogCacheSize = *dec.FilterLogCacheSize
+	}
 	if dec.Miner != nil {
 		c.Miner = *dec.Miner
 	}
@@ -264,14 +271,11 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.DocRoot != nil {
 		c.DocRoot = *dec.DocRoot
 	}
-	if dec.EWASMInterpreter != nil {
-		c.EWASMInterpreter = *dec.EWASMInterpreter
-	}
-	if dec.EVMInterpreter != nil {
-		c.EVMInterpreter = *dec.EVMInterpreter
-	}
 	if dec.RPCGasCap != nil {
 		c.RPCGasCap = *dec.RPCGasCap
+	}
+	if dec.RPCEVMTimeout != nil {
+		c.RPCEVMTimeout = *dec.RPCEVMTimeout
 	}
 	if dec.RPCTxFeeCap != nil {
 		c.RPCTxFeeCap = *dec.RPCTxFeeCap
@@ -281,6 +285,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.CheckpointOracle != nil {
 		c.CheckpointOracle = dec.CheckpointOracle
+	}
+	if dec.OverrideShanghai != nil {
+		c.OverrideShanghai = dec.OverrideShanghai
 	}
 	return nil
 }

@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snapshot
 
@@ -21,6 +21,7 @@ import (
 	"math/big"
 
 	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/rlp"
 )
 
@@ -41,10 +42,10 @@ func SlimAccount(nonce uint64, balance *big.Int, root common.Hash, codehash []by
 		Nonce:   nonce,
 		Balance: balance,
 	}
-	if root != emptyRoot {
+	if root != types.EmptyRootHash {
 		slim.Root = root[:]
 	}
-	if !bytes.Equal(codehash, emptyCode[:]) {
+	if !bytes.Equal(codehash, types.EmptyCodeHash[:]) {
 		slim.CodeHash = codehash
 	}
 	return slim
@@ -68,10 +69,10 @@ func FullAccount(data []byte) (Account, error) {
 		return Account{}, err
 	}
 	if len(account.Root) == 0 {
-		account.Root = emptyRoot[:]
+		account.Root = types.EmptyRootHash[:]
 	}
 	if len(account.CodeHash) == 0 {
-		account.CodeHash = emptyCode[:]
+		account.CodeHash = types.EmptyCodeHash[:]
 	}
 	return account, nil
 }

@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // signFile reads the contents of an input file and signs it (in armored format)
 // with the key provided, placing the signature into the output file.
@@ -25,7 +25,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 )
@@ -68,7 +68,7 @@ func SignFile(input string, output string, key string, untrustedComment string, 
 		trustedComment = fmt.Sprintf("timestamp:%d", time.Now().Unix())
 	}
 
-	filedata, err := ioutil.ReadFile(input)
+	filedata, err := os.ReadFile(input)
 	if err != nil {
 		return err
 	}
@@ -96,5 +96,5 @@ func SignFile(input string, output string, key string, untrustedComment string, 
 	fmt.Fprintln(out, base64.StdEncoding.EncodeToString(dataSig))
 	fmt.Fprintln(out, "trusted comment:", trustedComment)
 	fmt.Fprintln(out, base64.StdEncoding.EncodeToString(commentSig))
-	return ioutil.WriteFile(output, out.Bytes(), 0644)
+	return os.WriteFile(output, out.Bytes(), 0644)
 }

@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
@@ -34,10 +34,11 @@ type API struct {
 // GetWork returns a work package for external miner.
 //
 // The work package consists of 3 strings:
-//   result[0] - 32 bytes hex encoded current block header pow-hash
-//   result[1] - 32 bytes hex encoded seed hash used for DAG
-//   result[2] - 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
-//   result[3] - hex encoded block number
+//
+//	result[0] - 32 bytes hex encoded current block header pow-hash
+//	result[1] - 32 bytes hex encoded seed hash used for DAG
+//	result[2] - 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
+//	result[3] - hex encoded block number
 func (api *API) GetWork() ([4]string, error) {
 	if api.ethash.remote == nil {
 		return [4]string{}, errors.New("not supported")

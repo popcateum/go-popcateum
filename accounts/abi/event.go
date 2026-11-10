@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package abi
 
@@ -29,24 +29,27 @@ import (
 // don't get the signature canonical representation as the first LOG topic.
 type Event struct {
 	// Name is the event name used for internal representation. It's derived from
-	// the raw name and a suffix will be added in the case of a event overload.
+	// the raw name and a suffix will be added in the case of event overloading.
 	//
 	// e.g.
 	// These are two events that have the same name:
 	// * foo(int,int)
 	// * foo(uint,uint)
-	// The event name of the first one wll be resolved as foo while the second one
+	// The event name of the first one will be resolved as foo while the second one
 	// will be resolved as foo0.
 	Name string
+
 	// RawName is the raw event name parsed from ABI.
 	RawName   string
 	Anonymous bool
 	Inputs    Arguments
 	str       string
+
 	// Sig contains the string signature according to the ABI spec.
 	// e.g.	 event foo(uint32 a, int b) = "foo(uint32,int256)"
 	// Please note that "int" is substitute for its canonical representation "int256"
 	Sig string
+
 	// ID returns the canonical representation of the event's signature used by the
 	// abi definition to identify event names and types.
 	ID common.Hash

@@ -1,20 +1,20 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package p2p implements the Popcateum p2p network protocols.
+// Package p2p implements the Ethereum p2p network protocols.
 package p2p
 
 import (
@@ -94,7 +94,6 @@ type Config struct {
 	DiscoveryV5 bool `toml:",omitempty"`
 
 	// Name sets the node name of this server.
-	// Use common.MakeName to create a name that follows existing conventions.
 	Name string `toml:"-"`
 
 	// BootstrapNodes are used to establish connectivity
@@ -126,7 +125,7 @@ type Config struct {
 	// Protocols should contain the protocols supported
 	// by the server. Matching protocols are launched for
 	// each peer.
-	Protocols []Protocol `toml:"-"`
+	Protocols []Protocol `toml:"-" json:"-"`
 
 	// If ListenAddr is set to a non-nil address, the server
 	// will listen for incoming connections.
@@ -135,6 +134,10 @@ type Config struct {
 	// ListenAddr field will be updated with the actual address when
 	// the server is started.
 	ListenAddr string
+
+	// If DiscAddr is set to a non-nil value, the server will use ListenAddr
+	// for TCP and DiscAddr for the UDP discovery protocol.
+	DiscAddr string
 
 	// If set to a non-nil value, the given NAT port mapper
 	// is used to make the listening port available to the
@@ -353,7 +356,7 @@ func (srv *Server) RemovePeer(node *enode.Node) {
 	}
 }
 
-// AddTrustedPeer adds the given node to a reserved whitelist which allows the
+// AddTrustedPeer adds the given node to a reserved trusted list which allows the
 // node to always connect, even if the slot are full.
 func (srv *Server) AddTrustedPeer(node *enode.Node) {
 	select {
@@ -370,7 +373,7 @@ func (srv *Server) RemoveTrustedPeer(node *enode.Node) {
 	}
 }
 
-// SubscribePeers subscribes the given channel to peer events
+// SubscribeEvents subscribes the given channel to peer events
 func (srv *Server) SubscribeEvents(ch chan *PeerEvent) event.Subscription {
 	return srv.peerFeed.Subscribe(ch)
 }
@@ -440,7 +443,7 @@ func (srv *Server) Start() (err error) {
 		return errors.New("server already running")
 	}
 	srv.running = true
-	srv.log = srv.Config.Logger
+	srv.log = srv.Logger
 	if srv.log == nil {
 		srv.log = log.Root()
 	}
@@ -498,7 +501,7 @@ func (srv *Server) setupLocalNode() error {
 	sort.Sort(capsByNameAndVersion(srv.ourHandshake.Caps))
 
 	// Create the local node.
-	db, err := enode.OpenDB(srv.Config.NodeDatabase)
+	db, err := enode.OpenDB(srv.NodeDatabase)
 	if err != nil {
 		return err
 	}
@@ -549,7 +552,15 @@ func (srv *Server) setupDiscovery() error {
 		return nil
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
+	listenAddr := srv.ListenAddr
+
+	// Use an alternate listening address for UDP if
+	// a custom discovery address is configured.
+	if srv.DiscAddr != "" {
+		listenAddr = srv.DiscAddr
+	}
+
+	addr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return err
 	}
@@ -563,7 +574,7 @@ func (srv *Server) setupDiscovery() error {
 		if !realaddr.IP.IsLoopback() {
 			srv.loopWG.Add(1)
 			go func() {
-				nat.Map(srv.NAT, srv.quit, "udp", realaddr.Port, realaddr.Port, "popcateum discovery")
+				nat.Map(srv.NAT, srv.quit, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
 				srv.loopWG.Done()
 			}()
 		}
@@ -670,7 +681,7 @@ func (srv *Server) setupListening() error {
 		if !tcp.IP.IsLoopback() && srv.NAT != nil {
 			srv.loopWG.Add(1)
 			go func() {
-				nat.Map(srv.NAT, srv.quit, "tcp", tcp.Port, tcp.Port, "popcateum p2p")
+				nat.Map(srv.NAT, srv.quit, "tcp", tcp.Port, tcp.Port, "ethereum p2p")
 				srv.loopWG.Done()
 			}()
 		}
@@ -903,7 +914,7 @@ func (srv *Server) checkInboundConn(remoteIP net.IP) error {
 	}
 	// Reject connections that do not match NetRestrict.
 	if srv.NetRestrict != nil && !srv.NetRestrict.Contains(remoteIP) {
-		return fmt.Errorf("not whitelisted in NetRestrict")
+		return fmt.Errorf("not in netrestrict list")
 	}
 	// Reject Internet peers that try too often.
 	now := srv.clock.Now()
@@ -943,9 +954,8 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	}
 
 	// If dialing, figure out the remote public key.
-	var dialPubkey *ecdsa.PublicKey
 	if dialDest != nil {
-		dialPubkey = new(ecdsa.PublicKey)
+		dialPubkey := new(ecdsa.PublicKey)
 		if err := dialDest.Load((*enode.Secp256k1)(dialPubkey)); err != nil {
 			err = errors.New("dial destination doesn't have a secp256k1 public key")
 			srv.log.Trace("Setting up connection failed", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)
@@ -1046,7 +1056,7 @@ func (srv *Server) runPeer(p *Peer) {
 	// Broadcast peer drop to external subscribers. This needs to be
 	// after the send to delpeer so subscribers have a consistent view of
 	// the peer set (i.e. Server.Peers() doesn't include the peer when the
-	// event is received.
+	// event is received).
 	srv.peerFeed.Send(&PeerEvent{
 		Type:          PeerEventTypeDrop,
 		Peer:          p.ID(),
@@ -1061,7 +1071,7 @@ type NodeInfo struct {
 	ID    string `json:"id"`    // Unique node identifier (also the encryption key)
 	Name  string `json:"name"`  // Name of the node, including client type, version, OS, custom data
 	Enode string `json:"enode"` // Enode URL for adding this peer from remote peers
-	ENR   string `json:"enr"`   // Popcateum Node Record
+	ENR   string `json:"enr"`   // Ethereum Node Record
 	IP    string `json:"ip"`    // IP address of the node
 	Ports struct {
 		Discovery int `json:"discovery"` // UDP listening port for discovery protocol

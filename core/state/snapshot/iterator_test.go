@@ -1,23 +1,24 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snapshot
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
@@ -47,7 +48,7 @@ func TestAccountIteratorBasics(t *testing.T) {
 		if rand.Intn(2) == 0 {
 			accStorage := make(map[common.Hash][]byte)
 			value := make([]byte, 32)
-			rand.Read(value)
+			crand.Read(value)
 			accStorage[randomHash()] = value
 			storage[h] = accStorage
 		}
@@ -79,7 +80,7 @@ func TestStorageIteratorBasics(t *testing.T) {
 
 		var nilstorage int
 		for i := 0; i < 100; i++ {
-			rand.Read(value)
+			crand.Read(value)
 			if rand.Intn(2) == 0 {
 				accStorage[randomHash()] = common.CopyBytes(value)
 			} else {
@@ -819,7 +820,7 @@ func TestStorageIteratorDeletions(t *testing.T) {
 // only spit out 200 values eventually.
 //
 // The value-fetching benchmark is easy on the binary iterator, since it never has to reach
-// down at any depth for retrieving the values -- all are on the toppmost layer
+// down at any depth for retrieving the values -- all are on the topmost layer
 //
 // BenchmarkAccountIteratorTraversal/binary_iterator_keys-6         	    2239	    483674 ns/op
 // BenchmarkAccountIteratorTraversal/binary_iterator_values-6       	    2403	    501810 ns/op

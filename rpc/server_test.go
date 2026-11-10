@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rpc
 
@@ -20,8 +20,8 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -45,14 +45,14 @@ func TestServerRegisterName(t *testing.T) {
 		t.Fatalf("Expected service calc to be registered")
 	}
 
-	wantCallbacks := 9
+	wantCallbacks := 13
 	if len(svc.callbacks) != wantCallbacks {
 		t.Errorf("Expected %d callbacks for service 'service', got %d", wantCallbacks, len(svc.callbacks))
 	}
 }
 
 func TestServer(t *testing.T) {
-	files, err := ioutil.ReadDir("testdata")
+	files, err := os.ReadDir("testdata")
 	if err != nil {
 		t.Fatal("where'd my testdata go?")
 	}
@@ -70,7 +70,7 @@ func TestServer(t *testing.T) {
 
 func runTestScript(t *testing.T, file string) {
 	server := newTestServer()
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestServerShortLivedConn(t *testing.T) {
 		if err != nil {
 			t.Fatal("can't dial:", err)
 		}
-		defer conn.Close()
+
 		conn.SetDeadline(deadline)
 		// Write the request, then half-close the connection so the server stops reading.
 		conn.Write([]byte(request))
@@ -142,6 +142,8 @@ func TestServerShortLivedConn(t *testing.T) {
 		// Now try to get the response.
 		buf := make([]byte, 2000)
 		n, err := conn.Read(buf)
+		conn.Close()
+
 		if err != nil {
 			t.Fatal("read error:", err)
 		}

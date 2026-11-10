@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/math"
 	"github.com/popcateum/go-popcateum/consensus"
@@ -39,42 +39,43 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	DefaultRewardValue						= "50000000000000000000" //5e+19
-	DefaultRewardBigInt, _				= big.NewInt(0).SetString(DefaultRewardValue, 10)
-	PopcornRewardValue						= "30000000000000000000" //3e+19
-	PopcornRewardBigInt, _				= big.NewInt(0).SetString(PopcornRewardValue, 10)
-	SeaPopRewardValue							= "10000000000000000000" //1e+19
-	SeaPopRewardBigInt, _					= big.NewInt(0).SetString(SeaPopRewardValue, 10)
-
-	FrontierBlockReward           = DefaultRewardBigInt // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward          = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Byzantium
-	ConstantinopleBlockReward     = DefaultRewardBigInt // Block reward in wei for successfully mining a block upward from Constantinople
-	PopcornBlockReward          	= PopcornRewardBigInt // Block reward in wei for successfully mining a block upward from Popcorn
-	SeaPopBlockReward     				= SeaPopRewardBigInt // Block reward in wei for successfully mining a block upward from SeaPop
+	FrontierBlockReward           = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward          = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
+	ConstantinopleBlockReward     = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
 	maxUncles                     = 2                 // Maximum number of uncles allowed in a single block
 	allowedFutureBlockTimeSeconds = int64(15)         // Max seconds from current time allowed for blocks, before they're considered future blocks
 
-	// PopSong hard fork update.
-	// Decrease average block time to 6 ~ 11s.
-	// It offsets the bomb 3M blocks from Eip2384, so in total 12M blocks.
-	calcDifficultyPopSong = makePopcateumDifficultyCalculator(big.NewInt(12000000))
+	// calcDifficultyEip5133 is the difficulty adjustment algorithm as specified by EIP 5133.
+	// It offsets the bomb a total of 11.4M blocks.
+	// Specification EIP-5133: https://eips.ethereum.org/EIPS/eip-5133
+	calcDifficultyEip5133 = makeDifficultyCalculator(big.NewInt(11_400_000))
+
+	// calcDifficultyEip4345 is the difficulty adjustment algorithm as specified by EIP 4345.
+	// It offsets the bomb a total of 10.7M blocks.
+	// Specification EIP-4345: https://eips.ethereum.org/EIPS/eip-4345
+	calcDifficultyEip4345 = makeDifficultyCalculator(big.NewInt(10_700_000))
+
+	// calcDifficultyEip3554 is the difficulty adjustment algorithm as specified by EIP 3554.
+	// It offsets the bomb a total of 9.7M blocks.
+	// Specification EIP-3554: https://eips.ethereum.org/EIPS/eip-3554
+	calcDifficultyEip3554 = makeDifficultyCalculator(big.NewInt(9700000))
 
 	// calcDifficultyEip2384 is the difficulty adjustment algorithm as specified by EIP 2384.
 	// It offsets the bomb 4M blocks from Constantinople, so in total 9M blocks.
-	// Specification EIP-2384: https://eips.popcateum.org/EIPS/eip-2384
+	// Specification EIP-2384: https://eips.ethereum.org/EIPS/eip-2384
 	calcDifficultyEip2384 = makeDifficultyCalculator(big.NewInt(9000000))
 
 	// calcDifficultyConstantinople is the difficulty adjustment algorithm for Constantinople.
 	// It returns the difficulty that a new block should have when created at time given the
 	// parent block's time and difficulty. The calculation uses the Byzantium rules, but with
 	// bomb offset 5M.
-	// Specification EIP-1234: https://eips.popcateum.org/EIPS/eip-1234
+	// Specification EIP-1234: https://eips.ethereum.org/EIPS/eip-1234
 	calcDifficultyConstantinople = makeDifficultyCalculator(big.NewInt(5000000))
 
 	// calcDifficultyByzantium is the difficulty adjustment algorithm. It returns
 	// the difficulty that a new block should have when created at time given the
 	// parent block's time and difficulty. The calculation uses the Byzantium rules.
-	// Specification EIP-649: https://eips.popcateum.org/EIPS/eip-649
+	// Specification EIP-649: https://eips.ethereum.org/EIPS/eip-649
 	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
 )
 
@@ -100,7 +101,7 @@ func (ethash *Ethash) Author(header *types.Header) (common.Address, error) {
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the
-// stock Popcateum ethash engine.
+// stock Ethereum ethash engine.
 func (ethash *Ethash) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
 	// If we're running a full engine faking, accept any input as valid
 	if ethash.config.PowMode == ModeFullFake {
@@ -199,7 +200,7 @@ func (ethash *Ethash) verifyHeaderWorker(chain consensus.ChainHeaderReader, head
 }
 
 // VerifyUncles verifies that the given block's uncles conform to the consensus
-// rules of the stock Popcateum ethash engine.
+// rules of the stock Ethereum ethash engine.
 func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
 	// If we're running a full engine faking, accept any input as valid
 	if ethash.config.PowMode == ModeFullFake {
@@ -213,7 +214,7 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 		return nil
 	}
 	// Gather the set of past uncles and ancestors
-	uncles, ancestors := mapset.NewSet(), make(map[common.Hash]*types.Header)
+	uncles, ancestors := mapset.NewSet[common.Hash](), make(map[common.Hash]*types.Header)
 
 	number, parent := block.NumberU64()-1, block.ParentHash()
 	for i := 0; i < 7; i++ {
@@ -224,7 +225,7 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 		ancestors[parent] = ancestorHeader
 		// If the ancestor doesn't have any uncles, we don't have to iterate them
 		if ancestorHeader.UncleHash != types.EmptyUncleHash {
-			// Need to add those uncles to the blacklist too
+			// Need to add those uncles to the banned list too
 			ancestor := chain.GetBlock(parent, number)
 			if ancestor == nil {
 				break
@@ -262,7 +263,7 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 }
 
 // verifyHeader checks whether a header conforms to the consensus rules of the
-// stock Popcateum ethash engine.
+// stock Ethereum ethash engine.
 // See YP section 4.3.4. "Block Header Validity"
 func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool, unixNow int64) error {
 	// Ensure that the header's extra-data section is of a reasonable size
@@ -285,28 +286,35 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, pa
 		return fmt.Errorf("invalid difficulty: have %v, want %v", header.Difficulty, expected)
 	}
 	// Verify that the gas limit is <= 2^63-1
-	cap := uint64(0x7fffffffffffffff)
-	if header.GasLimit > cap {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, cap)
+	if header.GasLimit > params.MaxGasLimit {
+		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
 	}
 	// Verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-
-	// Verify that the gas limit remains within allowed bounds
-	diff := int64(parent.GasLimit) - int64(header.GasLimit)
-	if diff < 0 {
-		diff *= -1
-	}
-	limit := parent.GasLimit / params.GasLimitBoundDivisor
-
-	if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
-		return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
+	// Verify the block's gas usage and (if applicable) verify the base fee.
+	if !chain.Config().IsLondon(header.Number) {
+		// Verify BaseFee not present before EIP-1559 fork.
+		if header.BaseFee != nil {
+			return fmt.Errorf("invalid baseFee before fork: have %d, expected 'nil'", header.BaseFee)
+		}
+		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
+			return err
+		}
+	} else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
+		// Verify the header's EIP-1559 attributes.
+		return err
 	}
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
+	}
+	if chain.Config().IsShanghai(header.Time) {
+		return fmt.Errorf("ethash does not support shanghai fork")
+	}
+	if chain.Config().IsCancun(header.Time) {
+		return fmt.Errorf("ethash does not support cancun fork")
 	}
 	// Verify the engine specific seal securing the block
 	if seal {
@@ -316,9 +324,6 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, pa
 	}
 	// If all checks passed, validate any special fields for hard forks
 	if err := misc.VerifyDAOHeaderExtraData(chain.Config(), header); err != nil {
-		return err
-	}
-	if err := misc.VerifyForkHashes(chain.Config(), header, uncle); err != nil {
 		return err
 	}
 	return nil
@@ -337,10 +342,16 @@ func (ethash *Ethash) CalcDifficulty(chain consensus.ChainHeaderReader, time uin
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
-	case config.IsCatalyst(next):
-		return big.NewInt(1)
 	case config.IsPopSong(next):
+		// PopSong continues across London; do not substitute Ethereum's
+		// nine-second adjustment or its bomb schedule on this chain.
 		return calcDifficultyPopSong(time, parent)
+	case config.IsGrayGlacier(next):
+		return calcDifficultyEip5133(time, parent)
+	case config.IsArrowGlacier(next):
+		return calcDifficultyEip4345(time, parent)
+	case config.IsLondon(next):
+		return calcDifficultyEip3554(time, parent)
 	case config.IsMuirGlacier(next):
 		return calcDifficultyEip2384(time, parent)
 	case config.IsConstantinople(next):
@@ -359,74 +370,10 @@ var (
 	expDiffPeriod = big.NewInt(100000)
 	big1          = big.NewInt(1)
 	big2          = big.NewInt(2)
-	big6          = big.NewInt(6)
 	big9          = big.NewInt(9)
 	big10         = big.NewInt(10)
 	bigMinus99    = big.NewInt(-99)
 )
-
-// makePopcateumDifficultyCalculator creates a difficultyCalculator with the given bomb-delay.
-// the difficulty is calculated with Byzantium rules, which differs from Homestead in
-// how uncles affect the calculation
-func makePopcateumDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
-	// Note, the calculations below looks at the parent number, which is 1 below
-	// the block number. Thus we remove one from the delay given
-	bombDelayFromParent := new(big.Int).Sub(bombDelay, big1)
-	return func(time uint64, parent *types.Header) *big.Int {
-		// https://github.com/popcateum/EIPs/issues/100.
-		// algorithm:
-		// diff = (parent_diff +
-		//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
-		//        ) + 2^(periodCount - 2)
-
-		bigTime := new(big.Int).SetUint64(time)
-		bigParentTime := new(big.Int).SetUint64(parent.Time)
-
-		// holds intermediate values to make the algo easier to read & audit
-		x := new(big.Int)
-		y := new(big.Int)
-
-		// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 6
-		x.Sub(bigTime, bigParentTime)
-		x.Div(x, big6)
-		if parent.UncleHash == types.EmptyUncleHash {
-			x.Sub(big1, x)
-		} else {
-			x.Sub(big2, x)
-		}
-		// max((2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 9, -99)
-		if x.Cmp(bigMinus99) < 0 {
-			x.Set(bigMinus99)
-		}
-		// parent_diff + (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
-		y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
-		x.Mul(y, x)
-		x.Add(parent.Difficulty, x)
-
-		// minimum difficulty can ever be (before exponential factor)
-		if x.Cmp(params.MinimumDifficulty) < 0 {
-			x.Set(params.MinimumDifficulty)
-		}
-		// calculate a fake block number for the ice-age delay
-		// Specification: https://eips.popcateum.org/EIPS/eip-1234
-		fakeBlockNumber := new(big.Int)
-		if parent.Number.Cmp(bombDelayFromParent) >= 0 {
-			fakeBlockNumber = fakeBlockNumber.Sub(parent.Number, bombDelayFromParent)
-		}
-		// for the exponential factor
-		periodCount := fakeBlockNumber
-		periodCount.Div(periodCount, expDiffPeriod)
-
-		// the exponential factor, commonly referred to as "the bomb"
-		// diff = diff + 2^(periodCount - 2)
-		if periodCount.Cmp(big1) > 0 {
-			y.Sub(periodCount, big2)
-			y.Exp(big2, y, nil)
-			x.Add(x, y)
-		}
-		return x
-	}
-}
 
 // makeDifficultyCalculator creates a difficultyCalculator with the given bomb-delay.
 // the difficulty is calculated with Byzantium rules, which differs from Homestead in
@@ -436,7 +383,7 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 	// the block number. Thus we remove one from the delay given
 	bombDelayFromParent := new(big.Int).Sub(bombDelay, big1)
 	return func(time uint64, parent *types.Header) *big.Int {
-		// https://github.com/popcateum/EIPs/issues/100.
+		// https://github.com/ethereum/EIPs/issues/100.
 		// algorithm:
 		// diff = (parent_diff +
 		//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
@@ -471,7 +418,7 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 			x.Set(params.MinimumDifficulty)
 		}
 		// calculate a fake block number for the ice-age delay
-		// Specification: https://eips.popcateum.org/EIPS/eip-1234
+		// Specification: https://eips.ethereum.org/EIPS/eip-1234
 		fakeBlockNumber := new(big.Int)
 		if parent.Number.Cmp(bombDelayFromParent) >= 0 {
 			fakeBlockNumber = fakeBlockNumber.Sub(parent.Number, bombDelayFromParent)
@@ -495,7 +442,7 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 // the difficulty that a new block should have when created at time given the
 // parent block's time and difficulty. The calculation uses the Homestead rules.
 func calcDifficultyHomestead(time uint64, parent *types.Header) *big.Int {
-	// https://github.com/popcateum/EIPs/blob/master/EIPS/eip-2.md
+	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2.md
 	// algorithm:
 	// diff = (parent_diff +
 	//         (parent_diff / 2048 * max(1 - (block_timestamp - parent_timestamp) // 10, -99))
@@ -574,10 +521,9 @@ func calcDifficultyFrontier(time uint64, parent *types.Header) *big.Int {
 }
 
 // Exported for fuzzing
-var FrontierDifficultyCalulator = calcDifficultyFrontier
-var HomesteadDifficultyCalulator = calcDifficultyHomestead
+var FrontierDifficultyCalculator = calcDifficultyFrontier
+var HomesteadDifficultyCalculator = calcDifficultyHomestead
 var DynamicDifficultyCalculator = makeDifficultyCalculator
-var DynamicPopcateumDifficultyCalculator = makePopcateumDifficultyCalculator
 
 // verifySeal checks whether a block satisfies the PoW difficulty requirements,
 // either using the usual ethash cache for it, or alternatively using a full DAG
@@ -656,19 +602,23 @@ func (ethash *Ethash) Prepare(chain consensus.ChainHeaderReader, header *types.H
 	return nil
 }
 
-// Finalize implements consensus.Engine, accumulating the block and uncle rewards,
-// setting the final state on the header
-func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
-	// Accumulate any block and uncle rewards and commit the final state root
+// Finalize implements consensus.Engine, accumulating the block and uncle rewards.
+func (ethash *Ethash) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal) {
+	// Accumulate any block and uncle rewards
 	accumulateRewards(chain.Config(), state, header, uncles)
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and
 // uncle rewards, setting the final state and assembling the block.
-func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, error) {
+	if len(withdrawals) > 0 {
+		return nil, errors.New("ethash does not support withdrawals")
+	}
 	// Finalize block
-	ethash.Finalize(chain, header, state, txs, uncles)
+	ethash.Finalize(chain, header, state, txs, uncles, nil)
+
+	// Assign the final state root to header.
+	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil)), nil
@@ -678,7 +628,7 @@ func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
 func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
 
-	rlp.Encode(hasher, []interface{}{
+	enc := []interface{}{
 		header.ParentHash,
 		header.UncleHash,
 		header.Coinbase,
@@ -692,7 +642,14 @@ func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 		header.GasUsed,
 		header.Time,
 		header.Extra,
-	})
+	}
+	if header.BaseFee != nil {
+		enc = append(enc, header.BaseFee)
+	}
+	if header.WithdrawalsHash != nil {
+		panic("withdrawal hash set on ethash")
+	}
+	rlp.Encode(hasher, enc)
 	hasher.Sum(hash[:0])
 	return hash
 }
@@ -707,10 +664,6 @@ var (
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-	// Skip block reward in catalyst mode
-	if config.IsCatalyst(header.Number) {
-		return
-	}
 	// Select the correct block reward based on chain progression
 	blockReward := FrontierBlockReward
 	if config.IsByzantium(header.Number) {
@@ -719,11 +672,14 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	if config.IsConstantinople(header.Number) {
 		blockReward = ConstantinopleBlockReward
 	}
-	if config.IsPopcorn(header.Number) {
-		blockReward = PopcornBlockReward
-	}
-	if config.IsSeaPop(header.Number) {
-		blockReward = SeaPopBlockReward
+	// Popcateum issued 50 POP before Popcorn and 30 POP afterwards.
+	// Scope this rule to configured Popcateum forks, leaving custom Ethereum
+	// test chains and their upstream fixtures unchanged.
+	if config.PopSongBlock != nil || config.PopcornBlock != nil {
+		blockReward = new(big.Int).Mul(big.NewInt(50), big.NewInt(params.Ether))
+		if config.IsPopcorn(header.Number) {
+			blockReward = new(big.Int).Mul(big.NewInt(30), big.NewInt(params.Ether))
+		}
 	}
 	// Accumulate the rewards for the miner and any included uncles
 	reward := new(big.Int).Set(blockReward)
@@ -739,4 +695,67 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		reward.Add(reward, r)
 	}
 	state.AddBalance(header.Coinbase, reward)
+}
+
+// PopSong preserves the deployed six-second adjustment and 12M bomb delay.
+var calcDifficultyPopSong = makePopcateumDifficultyCalculator(big.NewInt(12_000_000))
+
+func makePopcateumDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
+	// Note, the calculations below looks at the parent number, which is 1 below
+	// the block number. Thus we remove one from the delay given
+	bombDelayFromParent := new(big.Int).Sub(bombDelay, big1)
+	return func(time uint64, parent *types.Header) *big.Int {
+		// https://github.com/popcateum/EIPs/issues/100.
+		// algorithm:
+		// diff = (parent_diff +
+		//         (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
+		//        ) + 2^(periodCount - 2)
+
+		bigTime := new(big.Int).SetUint64(time)
+		bigParentTime := new(big.Int).SetUint64(parent.Time)
+
+		// holds intermediate values to make the algo easier to read & audit
+		x := new(big.Int)
+		y := new(big.Int)
+
+		// (2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 6
+		x.Sub(bigTime, bigParentTime)
+		x.Div(x, big.NewInt(6))
+		if parent.UncleHash == types.EmptyUncleHash {
+			x.Sub(big1, x)
+		} else {
+			x.Sub(big2, x)
+		}
+		// max((2 if len(parent_uncles) else 1) - (block_timestamp - parent_timestamp) // 9, -99)
+		if x.Cmp(bigMinus99) < 0 {
+			x.Set(bigMinus99)
+		}
+		// parent_diff + (parent_diff / 2048 * max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99))
+		y.Div(parent.Difficulty, params.DifficultyBoundDivisor)
+		x.Mul(y, x)
+		x.Add(parent.Difficulty, x)
+
+		// minimum difficulty can ever be (before exponential factor)
+		if x.Cmp(params.MinimumDifficulty) < 0 {
+			x.Set(params.MinimumDifficulty)
+		}
+		// calculate a fake block number for the ice-age delay
+		// Specification: https://eips.popcateum.org/EIPS/eip-1234
+		fakeBlockNumber := new(big.Int)
+		if parent.Number.Cmp(bombDelayFromParent) >= 0 {
+			fakeBlockNumber = fakeBlockNumber.Sub(parent.Number, bombDelayFromParent)
+		}
+		// for the exponential factor
+		periodCount := fakeBlockNumber
+		periodCount.Div(periodCount, expDiffPeriod)
+
+		// the exponential factor, commonly referred to as "the bomb"
+		// diff = diff + 2^(periodCount - 2)
+		if periodCount.Cmp(big1) > 0 {
+			y.Sub(periodCount, big2)
+			y.Exp(big2, y, nil)
+			x.Add(x, y)
+		}
+		return x
+	}
 }

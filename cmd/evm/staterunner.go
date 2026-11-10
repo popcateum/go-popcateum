@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -20,18 +20,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 
+	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core/state"
 	"github.com/popcateum/go-popcateum/core/vm"
+	"github.com/popcateum/go-popcateum/eth/tracers/logger"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/tests"
-
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
-var stateTestCommand = cli.Command{
+var stateTestCommand = &cli.Command{
 	Action:    stateTestCmd,
 	Name:      "statetest",
 	Usage:     "executes the given state tests",
@@ -41,46 +41,47 @@ var stateTestCommand = cli.Command{
 // StatetestResult contains the execution status after running a state test, any
 // error that might have occurred and a dump of the final state if requested.
 type StatetestResult struct {
-	Name  string      `json:"name"`
-	Pass  bool        `json:"pass"`
-	Fork  string      `json:"fork"`
-	Error string      `json:"error,omitempty"`
-	State *state.Dump `json:"state,omitempty"`
+	Name  string       `json:"name"`
+	Pass  bool         `json:"pass"`
+	Root  *common.Hash `json:"stateRoot,omitempty"`
+	Fork  string       `json:"fork"`
+	Error string       `json:"error,omitempty"`
+	State *state.Dump  `json:"state,omitempty"`
 }
 
 func stateTestCmd(ctx *cli.Context) error {
 	if len(ctx.Args().First()) == 0 {
 		return errors.New("path-to-test argument required")
 	}
-	// Configure the go-popcateum logger
+	// Configure the go-ethereum logger
 	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
-	glogger.Verbosity(log.Lvl(ctx.GlobalInt(VerbosityFlag.Name)))
+	glogger.Verbosity(log.Lvl(ctx.Int(VerbosityFlag.Name)))
 	log.Root().SetHandler(glogger)
 
 	// Configure the EVM logger
-	config := &vm.LogConfig{
-		DisableMemory:     ctx.GlobalBool(DisableMemoryFlag.Name),
-		DisableStack:      ctx.GlobalBool(DisableStackFlag.Name),
-		DisableStorage:    ctx.GlobalBool(DisableStorageFlag.Name),
-		DisableReturnData: ctx.GlobalBool(DisableReturnDataFlag.Name),
+	config := &logger.Config{
+		EnableMemory:     !ctx.Bool(DisableMemoryFlag.Name),
+		DisableStack:     ctx.Bool(DisableStackFlag.Name),
+		DisableStorage:   ctx.Bool(DisableStorageFlag.Name),
+		EnableReturnData: !ctx.Bool(DisableReturnDataFlag.Name),
 	}
 	var (
-		tracer   vm.Tracer
-		debugger *vm.StructLogger
+		tracer   vm.EVMLogger
+		debugger *logger.StructLogger
 	)
 	switch {
-	case ctx.GlobalBool(MachineFlag.Name):
-		tracer = vm.NewJSONLogger(config, os.Stderr)
+	case ctx.Bool(MachineFlag.Name):
+		tracer = logger.NewJSONLogger(config, os.Stderr)
 
-	case ctx.GlobalBool(DebugFlag.Name):
-		debugger = vm.NewStructLogger(config)
+	case ctx.Bool(DebugFlag.Name):
+		debugger = logger.NewStructLogger(config)
 		tracer = debugger
 
 	default:
-		debugger = vm.NewStructLogger(config)
+		debugger = logger.NewStructLogger(config)
 	}
 	// Load the test content from the input file
-	src, err := ioutil.ReadFile(ctx.Args().First())
+	src, err := os.ReadFile(ctx.Args().First())
 	if err != nil {
 		return err
 	}
@@ -91,23 +92,26 @@ func stateTestCmd(ctx *cli.Context) error {
 	// Iterate over all the tests, run them and aggregate the results
 	cfg := vm.Config{
 		Tracer: tracer,
-		Debug:  ctx.GlobalBool(DebugFlag.Name) || ctx.GlobalBool(MachineFlag.Name),
 	}
 	results := make([]StatetestResult, 0, len(tests))
 	for key, test := range tests {
 		for _, st := range test.Subtests() {
 			// Run the test and aggregate the result
 			result := &StatetestResult{Name: key, Fork: st.Fork, Pass: true}
-			_, state, err := test.Run(st, cfg, false)
+			_, s, err := test.Run(st, cfg, false)
 			// print state root for evmlab tracing
-			if ctx.GlobalBool(MachineFlag.Name) && state != nil {
-				fmt.Fprintf(os.Stderr, "{\"stateRoot\": \"%x\"}\n", state.IntermediateRoot(false))
+			if s != nil {
+				root := s.IntermediateRoot(false)
+				result.Root = &root
+				if ctx.Bool(MachineFlag.Name) {
+					fmt.Fprintf(os.Stderr, "{\"stateRoot\": \"%#x\"}\n", root)
+				}
 			}
 			if err != nil {
 				// Test failed, mark as so and dump any state to aid debugging
 				result.Pass, result.Error = false, err.Error()
-				if ctx.GlobalBool(DumpFlag.Name) && state != nil {
-					dump := state.RawDump(false, false, true)
+				if ctx.Bool(DumpFlag.Name) && s != nil {
+					dump := s.RawDump(nil)
 					result.State = &dump
 				}
 			}
@@ -115,10 +119,10 @@ func stateTestCmd(ctx *cli.Context) error {
 			results = append(results, *result)
 
 			// Print any structured logs collected
-			if ctx.GlobalBool(DebugFlag.Name) {
+			if ctx.Bool(DebugFlag.Name) {
 				if debugger != nil {
 					fmt.Fprintln(os.Stderr, "#### TRACE ####")
-					vm.WriteTrace(os.Stderr, debugger.StructLogs())
+					logger.WriteTrace(os.Stderr, debugger.StructLogs())
 				}
 			}
 		}

@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -29,12 +29,19 @@ import (
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/core/state"
 	"github.com/popcateum/go-popcateum/crypto"
+	"github.com/popcateum/go-popcateum/trie"
 )
 
 var dumper = spew.ConfigState{Indent: "    "}
 
 func accountRangeTest(t *testing.T, trie *state.Trie, statedb *state.StateDB, start common.Hash, requestedNum int, expectedNum int) state.IteratorDump {
-	result := statedb.IteratorDump(true, true, false, start.Bytes(), requestedNum)
+	result := statedb.IteratorDump(&state.DumpConfig{
+		SkipCode:          true,
+		SkipStorage:       true,
+		OnlyWithAddresses: false,
+		Start:             start.Bytes(),
+		Max:               uint64(requestedNum),
+	})
 
 	if len(result.Accounts) != expectedNum {
 		t.Fatalf("expected %d results, got %d", expectedNum, len(result.Accounts))
@@ -60,7 +67,7 @@ func TestAccountRange(t *testing.T) {
 	t.Parallel()
 
 	var (
-		statedb  = state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), nil)
+		statedb  = state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &trie.Config{Preimages: true})
 		state, _ = state.New(common.Hash{}, statedb, nil)
 		addrs    = [AccountRangeMaxResults * 2]common.Address{}
 		m        = map[common.Address]bool{}
@@ -131,12 +138,17 @@ func TestEmptyAccountRange(t *testing.T) {
 	t.Parallel()
 
 	var (
-		statedb  = state.NewDatabase(rawdb.NewMemoryDatabase())
-		state, _ = state.New(common.Hash{}, statedb, nil)
+		statedb = state.NewDatabase(rawdb.NewMemoryDatabase())
+		st, _   = state.New(common.Hash{}, statedb, nil)
 	)
-	state.Commit(true)
-	state.IntermediateRoot(true)
-	results := state.IteratorDump(true, true, true, (common.Hash{}).Bytes(), AccountRangeMaxResults)
+	st.Commit(true)
+	st.IntermediateRoot(true)
+	results := st.IteratorDump(&state.DumpConfig{
+		SkipCode:          true,
+		SkipStorage:       true,
+		OnlyWithAddresses: true,
+		Max:               uint64(AccountRangeMaxResults),
+	})
 	if bytes.Equal(results.Next, (common.Hash{}).Bytes()) {
 		t.Fatalf("Empty results should not return a second page")
 	}
@@ -197,12 +209,16 @@ func TestStorageRangeAt(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		result, err := storageRangeAt(state.StorageTrie(addr), test.start, test.limit)
+		tr, err := state.StorageTrie(addr)
+		if err != nil {
+			t.Error(err)
+		}
+		result, err := storageRangeAt(tr, test.start, test.limit)
 		if err != nil {
 			t.Error(err)
 		}
 		if !reflect.DeepEqual(result, test.want) {
-			t.Fatalf("wrong result for range 0x%x.., limit %d:\ngot %s\nwant %s",
+			t.Fatalf("wrong result for range %#x.., limit %d:\ngot %s\nwant %s",
 				test.start, test.limit, dumper.Sdump(result), dumper.Sdump(&test.want))
 		}
 	}

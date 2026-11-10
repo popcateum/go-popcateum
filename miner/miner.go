@@ -1,25 +1,26 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package miner implements Popcateum block creation and mining.
+// Package miner implements Ethereum block creation and mining.
 package miner
 
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/popcateum/go-popcateum/common"
@@ -27,6 +28,7 @@ import (
 	"github.com/popcateum/go-popcateum/consensus"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/event"
@@ -34,15 +36,16 @@ import (
 	"github.com/popcateum/go-popcateum/params"
 )
 
-// Backend wraps all methods required for mining.
+// Backend wraps all methods required for mining. Only full node is capable
+// to offer all the functions here.
 type Backend interface {
 	BlockChain() *core.BlockChain
-	TxPool() *core.TxPool
+	TxPool() *txpool.TxPool
 }
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Popcatbase  common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
+	Etherbase  common.Address `toml:",omitempty"` // Public address for block mining rewards
 	Notify     []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
 	NotifyFull bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
 	ExtraData  hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
@@ -51,32 +54,48 @@ type Config struct {
 	GasPrice   *big.Int       // Minimum gas price for mining a transaction
 	Recommit   time.Duration  // The time interval for miner to re-create mining work.
 	Noverify   bool           // Disable remote mining solution verification(only useful in ethash).
+
+	NewPayloadTimeout time.Duration // The maximum time allowance for creating a new payload
+}
+
+// DefaultConfig contains default settings for miner.
+var DefaultConfig = Config{
+	GasCeil:  30000000,
+	GasPrice: big.NewInt(params.GWei),
+
+	// The default recommit time is chosen as two seconds since
+	// consensus-layer usually will wait a half slot of time(6s)
+	// for payload generation. It should be enough for Geth to
+	// run 3 rounds.
+	Recommit:          2 * time.Second,
+	NewPayloadTimeout: 2 * time.Second,
 }
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mux      *event.TypeMux
-	worker   *worker
-	coinbase common.Address
-	eth      Backend
-	engine   consensus.Engine
-	exitCh   chan struct{}
-	startCh  chan common.Address
-	stopCh   chan struct{}
+	mux     *event.TypeMux
+	eth     Backend
+	engine  consensus.Engine
+	exitCh  chan struct{}
+	startCh chan struct{}
+	stopCh  chan struct{}
+	worker  *worker
+
+	wg sync.WaitGroup
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(header *types.Header) bool) *Miner {
 	miner := &Miner{
-		eth:     eth,
 		mux:     mux,
+		eth:     eth,
 		engine:  engine,
 		exitCh:  make(chan struct{}),
-		startCh: make(chan common.Address),
+		startCh: make(chan struct{}),
 		stopCh:  make(chan struct{}),
 		worker:  newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true),
 	}
+	miner.wg.Add(1)
 	go miner.update()
-
 	return miner
 }
 
@@ -85,6 +104,8 @@ func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *even
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
 // and halt your mining operation for as long as the DOS continues.
 func (miner *Miner) update() {
+	defer miner.wg.Done()
+
 	events := miner.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
 	defer func() {
 		if !events.Closed() {
@@ -116,20 +137,17 @@ func (miner *Miner) update() {
 			case downloader.FailedEvent:
 				canStart = true
 				if shouldStart {
-					miner.SetPopcatbase(miner.coinbase)
 					miner.worker.start()
 				}
 			case downloader.DoneEvent:
 				canStart = true
 				if shouldStart {
-					miner.SetPopcatbase(miner.coinbase)
 					miner.worker.start()
 				}
 				// Stop reacting to downloader events
 				events.Unsubscribe()
 			}
-		case addr := <-miner.startCh:
-			miner.SetPopcatbase(addr)
+		case <-miner.startCh:
 			if canStart {
 				miner.worker.start()
 			}
@@ -144,8 +162,8 @@ func (miner *Miner) update() {
 	}
 }
 
-func (miner *Miner) Start(coinbase common.Address) {
-	miner.startCh <- coinbase
+func (miner *Miner) Start() {
+	miner.startCh <- struct{}{}
 }
 
 func (miner *Miner) Stop() {
@@ -154,6 +172,7 @@ func (miner *Miner) Stop() {
 
 func (miner *Miner) Close() {
 	close(miner.exitCh)
+	miner.wg.Wait()
 }
 
 func (miner *Miner) Mining() bool {
@@ -194,9 +213,19 @@ func (miner *Miner) PendingBlock() *types.Block {
 	return miner.worker.pendingBlock()
 }
 
-func (miner *Miner) SetPopcatbase(addr common.Address) {
-	miner.coinbase = addr
-	miner.worker.setPopcatbase(addr)
+// PendingBlockAndReceipts returns the currently pending block and corresponding receipts.
+func (miner *Miner) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
+	return miner.worker.pendingBlockAndReceipts()
+}
+
+func (miner *Miner) SetEtherbase(addr common.Address) {
+	miner.worker.setEtherbase(addr)
+}
+
+// SetGasCeil sets the gaslimit to strive for when mining blocks post 1559.
+// For pre-1559 blocks, it sets the ceiling.
+func (miner *Miner) SetGasCeil(ceil uint64) {
+	miner.worker.setGasCeil(ceil)
 }
 
 // EnablePreseal turns on the preseal mining feature. It's enabled by default.
@@ -220,4 +249,9 @@ func (miner *Miner) DisablePreseal() {
 // to the given channel.
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
+}
+
+// BuildPayload builds the payload according to the provided parameters.
+func (miner *Miner) BuildPayload(args *BuildPayloadArgs) (*Payload, error) {
+	return miner.worker.buildPayload(args)
 }

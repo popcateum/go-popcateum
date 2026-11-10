@@ -1,29 +1,21 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package compiler wraps the Solidity and Vyper compiler executables (solc; vyper).
 package compiler
-
-import (
-	"bytes"
-	"io/ioutil"
-	"regexp"
-)
-
-var versionRegexp = regexp.MustCompile(`([0-9]+)\.([0-9]+)\.([0-9]+)`)
 
 // Contract contains information about a compiled contract, alongside its code and runtime code.
 type Contract struct {
@@ -50,16 +42,4 @@ type ContractInfo struct {
 	UserDoc         interface{} `json:"userDoc"`
 	DeveloperDoc    interface{} `json:"developerDoc"`
 	Metadata        string      `json:"metadata"`
-}
-
-func slurpFiles(files []string) (string, error) {
-	var concat bytes.Buffer
-	for _, file := range files {
-		content, err := ioutil.ReadFile(file)
-		if err != nil {
-			return "", err
-		}
-		concat.Write(content)
-	}
-	return concat.String(), nil
 }

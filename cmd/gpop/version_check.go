@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -20,17 +20,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
-	"github.com/popcateum/go-popcateum/log"
 	"github.com/jedisct1/go-minisign"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/popcateum/go-popcateum/log"
+	"github.com/urfave/cli/v2"
 )
 
-var gpopPubKeys []string = []string{
+var gethPubKeys []string = []string{
 	//@holiman, minisign public key FB1D084D39BAEC24
 	"RWQk7Lo5TQgd+wxBNZM+Zoy+7UhhMHaWKzqoes9tvSbFLJYZhNTbrIjx",
 	//minisign public key 138B1CA303E51687
@@ -72,7 +73,7 @@ func checkCurrent(url, current string) error {
 	if sig, err = fetch(fmt.Sprintf("%v.minisig", url)); err != nil {
 		return fmt.Errorf("could not retrieve signature: %w", err)
 	}
-	if err = verifySignature(gpopPubKeys, data, sig); err != nil {
+	if err = verifySignature(gethPubKeys, data, sig); err != nil {
 		return err
 	}
 	var vulns []vulnJson
@@ -112,14 +113,14 @@ func checkCurrent(url, current string) error {
 // fetch makes an HTTP request to the given url and returns the response body
 func fetch(url string) ([]byte, error) {
 	if filep := strings.TrimPrefix(url, "file://"); filep != url {
-		return ioutil.ReadFile(filep)
+		return os.ReadFile(filep)
 	}
 	res, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ func fetch(url string) ([]byte, error) {
 }
 
 // verifySignature checks that the sigData is a valid signature of the given
-// data, for pubkey GpopPubkey
+// data, for pubkey GethPubkey
 func verifySignature(pubkeys []string, data, sigdata []byte) error {
 	sig, err := minisign.DecodeSignature(string(sigdata))
 	if err != nil {

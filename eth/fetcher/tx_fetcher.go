@@ -1,32 +1,33 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package fetcher
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	mrand "math/rand"
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/mclock"
-	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/metrics"
@@ -40,7 +41,7 @@ const (
 	// maxTxRetrievals is the maximum transaction number can be fetched in one
 	// request. The rationale to pick 256 is:
 	//   - In eth protocol, the softResponseLimit is 2MB. Nowadays according to
-	//     Popcatscan the average transaction size is around 200B, so in theory
+	//     Etherscan the average transaction size is around 200B, so in theory
 	//     we can include lots of transaction in a single protocol packet.
 	//   - However the maximum size of a single transaction is raised to 128KB,
 	//     so pick a middle value here to ensure we can maximize the efficiency
@@ -119,7 +120,7 @@ type txDelivery struct {
 	direct bool          // Whether this is a direct reply or a broadcast
 }
 
-// txDrop is the notiication that a peer has disconnected.
+// txDrop is the notification that a peer has disconnected.
 type txDrop struct {
 	peer string
 }
@@ -147,13 +148,13 @@ type TxFetcher struct {
 	drop    chan *txDrop
 	quit    chan struct{}
 
-	underpriced mapset.Set // Transactions discarded as too cheap (don't re-fetch)
+	underpriced mapset.Set[common.Hash] // Transactions discarded as too cheap (don't re-fetch)
 
 	// Stage 1: Waiting lists for newly discovered transactions that might be
 	// broadcast without needing explicit request/reply round trips.
 	waitlist  map[common.Hash]map[string]struct{} // Transactions waiting for an potential broadcast
 	waittime  map[common.Hash]mclock.AbsTime      // Timestamps when transactions were added to the waitlist
-	waitslots map[string]map[common.Hash]struct{} // Waiting announcement sgroupped by peer (DoS protection)
+	waitslots map[string]map[common.Hash]struct{} // Waiting announcements grouped by peer (DoS protection)
 
 	// Stage 2: Queue of transactions that waiting to be allocated to some peer
 	// to be retrieved directly.
@@ -201,7 +202,7 @@ func NewTxFetcherForTests(
 		fetching:    make(map[common.Hash]string),
 		requests:    make(map[string]*txRequest),
 		alternates:  make(map[common.Hash]map[string]struct{}),
-		underpriced: mapset.NewSet(),
+		underpriced: mapset.NewSet[common.Hash](),
 		hasTx:       hasTx,
 		addTxs:      addTxs,
 		fetchTxs:    fetchTxs,
@@ -217,7 +218,7 @@ func (f *TxFetcher) Notify(peer string, hashes []common.Hash) error {
 	txAnnounceInMeter.Mark(int64(len(hashes)))
 
 	// Skip any transaction announcements that we already know of, or that we've
-	// previously marked as cheap and discarded. This check is of course racey,
+	// previously marked as cheap and discarded. This check is of course racy,
 	// because multiple concurrent notifies will still manage to pass it, but it's
 	// still valuable to check here because it runs concurrent  to the internal
 	// loop, so anything caught here is time saved internally.
@@ -259,58 +260,74 @@ func (f *TxFetcher) Notify(peer string, hashes []common.Hash) error {
 // Enqueue imports a batch of received transaction into the transaction pool
 // and the fetcher. This method may be called by both transaction broadcasts and
 // direct request replies. The differentiation is important so the fetcher can
-// re-shedule missing transactions as soon as possible.
+// re-schedule missing transactions as soon as possible.
 func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) error {
-	// Keep track of all the propagated transactions
-	if direct {
-		txReplyInMeter.Mark(int64(len(txs)))
-	} else {
-		txBroadcastInMeter.Mark(int64(len(txs)))
+	var (
+		inMeter          = txReplyInMeter
+		knownMeter       = txReplyKnownMeter
+		underpricedMeter = txReplyUnderpricedMeter
+		otherRejectMeter = txReplyOtherRejectMeter
+	)
+	if !direct {
+		inMeter = txBroadcastInMeter
+		knownMeter = txBroadcastKnownMeter
+		underpricedMeter = txBroadcastUnderpricedMeter
+		otherRejectMeter = txBroadcastOtherRejectMeter
 	}
+	// Keep track of all the propagated transactions
+	inMeter.Mark(int64(len(txs)))
+
 	// Push all the transactions into the pool, tracking underpriced ones to avoid
 	// re-requesting them and dropping the peer in case of malicious transfers.
 	var (
-		added       = make([]common.Hash, 0, len(txs))
-		duplicate   int64
-		underpriced int64
-		otherreject int64
+		added = make([]common.Hash, 0, len(txs))
 	)
-	errs := f.addTxs(txs)
-	for i, err := range errs {
-		if err != nil {
+	// proceed in batches
+	for i := 0; i < len(txs); i += 128 {
+		end := i + 128
+		if end > len(txs) {
+			end = len(txs)
+		}
+		var (
+			duplicate   int64
+			underpriced int64
+			otherreject int64
+		)
+		batch := txs[i:end]
+		for j, err := range f.addTxs(batch) {
 			// Track the transaction hash if the price is too low for us.
 			// Avoid re-request this transaction when we receive another
 			// announcement.
-			if err == core.ErrUnderpriced || err == core.ErrReplaceUnderpriced {
+			if errors.Is(err, txpool.ErrUnderpriced) || errors.Is(err, txpool.ErrReplaceUnderpriced) {
 				for f.underpriced.Cardinality() >= maxTxUnderpricedSetSize {
 					f.underpriced.Pop()
 				}
-				f.underpriced.Add(txs[i].Hash())
+				f.underpriced.Add(batch[j].Hash())
 			}
 			// Track a few interesting failure types
-			switch err {
-			case nil: // Noop, but need to handle to not count these
+			switch {
+			case err == nil: // Noop, but need to handle to not count these
 
-			case core.ErrAlreadyKnown:
+			case errors.Is(err, txpool.ErrAlreadyKnown):
 				duplicate++
 
-			case core.ErrUnderpriced, core.ErrReplaceUnderpriced:
+			case errors.Is(err, txpool.ErrUnderpriced) || errors.Is(err, txpool.ErrReplaceUnderpriced):
 				underpriced++
 
 			default:
 				otherreject++
 			}
+			added = append(added, batch[j].Hash())
 		}
-		added = append(added, txs[i].Hash())
-	}
-	if direct {
-		txReplyKnownMeter.Mark(duplicate)
-		txReplyUnderpricedMeter.Mark(underpriced)
-		txReplyOtherRejectMeter.Mark(otherreject)
-	} else {
-		txBroadcastKnownMeter.Mark(duplicate)
-		txBroadcastUnderpricedMeter.Mark(underpriced)
-		txBroadcastOtherRejectMeter.Mark(otherreject)
+		knownMeter.Mark(duplicate)
+		underpricedMeter.Mark(underpriced)
+		otherRejectMeter.Mark(otherreject)
+
+		// If 'other reject' is >25% of the deliveries in any batch, sleep a bit.
+		if otherreject > 128/4 {
+			time.Sleep(200 * time.Millisecond)
+			log.Warn("Peer delivering stale transactions", "peer", peer, "rejected", otherreject)
+		}
 	}
 	select {
 	case f.cleanup <- &txDelivery{origin: peer, hashes: added, direct: direct}:
@@ -559,7 +576,7 @@ func (f *TxFetcher) loop() {
 			// In case of a direct delivery, also reschedule anything missing
 			// from the original query
 			if delivery.direct {
-				// Mark the reqesting successful (independent of individual status)
+				// Mark the requesting successful (independent of individual status)
 				txRequestDoneMeter.Mark(int64(len(delivery.hashes)))
 
 				// Make sure something was pending, nuke it
@@ -608,7 +625,7 @@ func (f *TxFetcher) loop() {
 					delete(f.alternates, hash)
 					delete(f.fetching, hash)
 				}
-				// Something was delivered, try to rechedule requests
+				// Something was delivered, try to reschedule requests
 				f.scheduleFetches(timeoutTimer, timeoutTrigger, nil) // Partial delivery may enable others to deliver too
 			}
 
@@ -720,7 +737,7 @@ func (f *TxFetcher) rescheduleWait(timer *mclock.Timer, trigger chan struct{}) {
 // should be rescheduled if some request is pending. In practice, a timeout will
 // cause the timer to be rescheduled every 5 secs (until the peer comes through or
 // disconnects). This is a limitation of the fetcher code because we don't trac
-// pending requests and timed out requests separatey. Without double tracking, if
+// pending requests and timed out requests separately. Without double tracking, if
 // we simply didn't reschedule the timer on all-timeout then the timer would never
 // be set again since len(request) > 0 => something's running.
 func (f *TxFetcher) rescheduleTimeout(timer *mclock.Timer, trigger chan struct{}) {

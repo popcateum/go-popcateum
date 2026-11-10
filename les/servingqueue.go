@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -38,10 +38,10 @@ type servingQueue struct {
 	setThreadsCh            chan int
 
 	wg          sync.WaitGroup
-	threadCount int          // number of currently running threads
-	queue       *prque.Prque // priority queue for waiting or suspended tasks
-	best        *servingTask // the highest priority task (not included in the queue)
-	suspendBias int64        // priority bias against suspending an already running task
+	threadCount int                               // number of currently running threads
+	queue       *prque.Prque[int64, *servingTask] // priority queue for waiting or suspended tasks
+	best        *servingTask                      // the highest priority task (not included in the queue)
+	suspendBias int64                             // priority bias against suspending an already running task
 }
 
 // servingTask represents a request serving task. Tasks can be implemented to
@@ -123,7 +123,7 @@ func (t *servingTask) waitOrStop() bool {
 // newServingQueue returns a new servingQueue
 func newServingQueue(suspendBias int64, utilTarget float64) *servingQueue {
 	sq := &servingQueue{
-		queue:          prque.NewWrapAround(nil),
+		queue:          prque.New[int64, *servingTask](nil),
 		suspendBias:    suspendBias,
 		queueAddCh:     make(chan *servingTask, 100),
 		queueBestCh:    make(chan *servingTask),
@@ -159,27 +159,23 @@ func (sq *servingQueue) newTask(peer *clientPeer, maxTime uint64, priority int64
 // run tokens from the token channel and allow the corresponding tasks to run
 // without entering the priority queue.
 func (sq *servingQueue) threadController() {
+	defer sq.wg.Done()
 	for {
 		token := make(runToken)
 		select {
 		case best := <-sq.queueBestCh:
 			best.tokenCh <- token
 		case <-sq.stopThreadCh:
-			sq.wg.Done()
 			return
 		case <-sq.quit:
-			sq.wg.Done()
 			return
 		}
-		<-token
 		select {
 		case <-sq.stopThreadCh:
-			sq.wg.Done()
 			return
 		case <-sq.quit:
-			sq.wg.Done()
 			return
-		default:
+		case <-token:
 		}
 	}
 }
@@ -218,7 +214,7 @@ func (sq *servingQueue) freezePeers() {
 	}
 	sq.best = nil
 	for sq.queue.Size() > 0 {
-		task := sq.queue.PopItem().(*servingTask)
+		task := sq.queue.PopItem()
 		tasks := peerMap[task.peer]
 		if tasks == nil {
 			bufValue, bufLimit := task.peer.fcClient.BufferStatus()
@@ -255,7 +251,7 @@ func (sq *servingQueue) freezePeers() {
 		}
 	}
 	if sq.queue.Size() > 0 {
-		sq.best = sq.queue.PopItem().(*servingTask)
+		sq.best = sq.queue.PopItem()
 	}
 }
 
@@ -298,6 +294,7 @@ func (sq *servingQueue) addTask(task *servingTask) {
 // and always tries to send the highest priority task to queueBestCh. Successfully sent
 // tasks are removed from the queue.
 func (sq *servingQueue) queueLoop() {
+	defer sq.wg.Done()
 	for {
 		if sq.best != nil {
 			expTime := sq.best.expTime
@@ -313,10 +310,9 @@ func (sq *servingQueue) queueLoop() {
 				if sq.queue.Size() == 0 {
 					sq.best = nil
 				} else {
-					sq.best, _ = sq.queue.PopItem().(*servingTask)
+					sq.best = sq.queue.PopItem()
 				}
 			case <-sq.quit:
-				sq.wg.Done()
 				return
 			}
 		} else {
@@ -324,7 +320,6 @@ func (sq *servingQueue) queueLoop() {
 			case task := <-sq.queueAddCh:
 				sq.addTask(task)
 			case <-sq.quit:
-				sq.wg.Done()
 				return
 			}
 		}
@@ -335,6 +330,7 @@ func (sq *servingQueue) queueLoop() {
 // of active thread controller goroutines.
 func (sq *servingQueue) threadCountLoop() {
 	var threadCountTarget int
+	defer sq.wg.Done()
 	for {
 		for threadCountTarget > sq.threadCount {
 			sq.wg.Add(1)
@@ -347,14 +343,12 @@ func (sq *servingQueue) threadCountLoop() {
 			case sq.stopThreadCh <- struct{}{}:
 				sq.threadCount--
 			case <-sq.quit:
-				sq.wg.Done()
 				return
 			}
 		} else {
 			select {
 			case threadCountTarget = <-sq.setThreadsCh:
 			case <-sq.quit:
-				sq.wg.Done()
 				return
 			}
 		}

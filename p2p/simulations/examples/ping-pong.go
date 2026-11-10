@@ -1,25 +1,25 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -63,7 +63,7 @@ func main() {
 		adapter = adapters.NewSimAdapter(services)
 
 	case "exec":
-		tmpdir, err := ioutil.TempDir("", "p2p-example")
+		tmpdir, err := os.MkdirTemp("", "p2p-example")
 		if err != nil {
 			log.Crit("error creating temp dir", "err", err)
 		}
@@ -139,7 +139,7 @@ const (
 func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	log := p.log.New("peer.id", peer.ID())
 
-	errC := make(chan error)
+	errC := make(chan error, 1)
 	go func() {
 		for range time.Tick(10 * time.Second) {
 			log.Info("sending ping")
@@ -156,7 +156,7 @@ func (p *pingPongService) Run(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 				errC <- err
 				return
 			}
-			payload, err := ioutil.ReadAll(msg.Payload)
+			payload, err := io.ReadAll(msg.Payload)
 			if err != nil {
 				errC <- err
 				return

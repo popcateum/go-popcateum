@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
@@ -140,8 +140,9 @@ func (ethash *Ethash) mine(block *types.Block, id int, seed uint64, abort chan s
 	)
 	// Start generating random nonces until we abort or find a good one
 	var (
-		attempts = int64(0)
-		nonce    = seed
+		attempts  = int64(0)
+		nonce     = seed
+		powBuffer = new(big.Int)
 	)
 	logger := ethash.config.Log.New("miner", id)
 	logger.Trace("Started ethash search for new nonces", "seed", seed)
@@ -163,7 +164,7 @@ search:
 			}
 			// Compute the PoW value of this nonce
 			digest, result := hashimotoFull(dataset.dataset, hash, nonce)
-			if new(big.Int).SetBytes(result).Cmp(target) <= 0 {
+			if powBuffer.SetBytes(result).Cmp(target) <= 0 {
 				// Correct nonce found, create a new header with it
 				header = types.CopyHeader(header)
 				header.Nonce = types.EncodeNonce(nonce)
@@ -338,10 +339,11 @@ func (s *remoteSealer) loop() {
 // makeWork creates a work package for external miner.
 //
 // The work package consists of 3 strings:
-//   result[0], 32 bytes hex encoded current block header pow-hash
-//   result[1], 32 bytes hex encoded seed hash used for DAG
-//   result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
-//   result[3], hex encoded block number
+//
+//	result[0], 32 bytes hex encoded current block header pow-hash
+//	result[1], 32 bytes hex encoded seed hash used for DAG
+//	result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
+//	result[3], hex encoded block number
 func (s *remoteSealer) makeWork(block *types.Block) {
 	hash := s.ethash.SealHash(block.Header())
 	s.currentWork[0] = hash.Hex()
@@ -377,7 +379,7 @@ func (s *remoteSealer) notifyWork() {
 func (s *remoteSealer) sendNotification(ctx context.Context, url string, json []byte, work [4]string) {
 	defer s.reqWG.Done()
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(json))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(json))
 	if err != nil {
 		s.ethash.config.Log.Warn("Can't create remote miner notification", "err", err)
 		return

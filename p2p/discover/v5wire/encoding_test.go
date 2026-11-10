@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package v5wire
 
@@ -20,13 +20,12 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -39,8 +38,7 @@ import (
 
 // To regenerate discv5 test vectors, run
 //
-//     go test -run TestVectors -write-test-vectors
-//
+//	go test -run TestVectors -write-test-vectors
 var writeTestVectorsFlag = flag.Bool("write-test-vectors", false, "Overwrite discv5 test vectors in testdata/")
 
 var (
@@ -94,7 +92,7 @@ func TestHandshake(t *testing.T) {
 	}
 
 	// A <- B   NODES
-	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{Total: 1})
+	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{RespCount: 1})
 	net.nodeA.expectDecode(t, NodesMsg, nodes)
 }
 
@@ -152,7 +150,7 @@ func TestHandshake_norecord(t *testing.T) {
 	net.nodeB.expectDecode(t, FindnodeMsg, findnode)
 
 	// A <- B   NODES
-	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{Total: 1})
+	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{RespCount: 1})
 	net.nodeA.expectDecode(t, NodesMsg, nodes)
 }
 
@@ -192,7 +190,7 @@ func TestHandshake_rekey(t *testing.T) {
 	net.nodeB.expectDecode(t, FindnodeMsg, findnode)
 
 	// A <- B   NODES
-	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{Total: 1})
+	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{RespCount: 1})
 	net.nodeA.expectDecode(t, NodesMsg, nodes)
 }
 
@@ -227,7 +225,7 @@ func TestHandshake_rekey2(t *testing.T) {
 	net.nodeB.expectDecode(t, FindnodeMsg, findnode)
 
 	// A <- B   NODES
-	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{Total: 1})
+	nodes, _ := net.nodeB.encode(t, net.nodeA, &Nodes{RespCount: 1})
 	net.nodeA.expectDecode(t, NodesMsg, nodes)
 }
 
@@ -276,7 +274,15 @@ func TestDecodeErrorsV5(t *testing.T) {
 	net := newHandshakeTest()
 	defer net.close()
 
-	net.nodeA.expectDecodeErr(t, errTooShort, []byte{})
+	b := make([]byte, 0)
+	net.nodeA.expectDecodeErr(t, errTooShort, b)
+
+	b = make([]byte, 62)
+	net.nodeA.expectDecodeErr(t, errTooShort, b)
+
+	b = make([]byte, 63)
+	net.nodeA.expectDecodeErr(t, errInvalidHeader, b)
+
 	// TODO some more tests would be nice :)
 	// - check invalid authdata sizes
 	// - check invalid handshake data sizes
@@ -498,8 +504,8 @@ type handshakeTestNode struct {
 
 func newHandshakeTest() *handshakeTest {
 	t := new(handshakeTest)
-	t.nodeA.init(testKeyA, net.IP{127, 0, 0, 1}, &t.clock)
-	t.nodeB.init(testKeyB, net.IP{127, 0, 0, 1}, &t.clock)
+	t.nodeA.init(testKeyA, net.IP{127, 0, 0, 1}, &t.clock, DefaultProtocolID)
+	t.nodeB.init(testKeyB, net.IP{127, 0, 0, 1}, &t.clock, DefaultProtocolID)
 	return t
 }
 
@@ -508,14 +514,11 @@ func (t *handshakeTest) close() {
 	t.nodeB.ln.Database().Close()
 }
 
-func (n *handshakeTestNode) init(key *ecdsa.PrivateKey, ip net.IP, clock mclock.Clock) {
+func (n *handshakeTestNode) init(key *ecdsa.PrivateKey, ip net.IP, clock mclock.Clock, protocolID [6]byte) {
 	db, _ := enode.OpenDB("")
 	n.ln = enode.NewLocalNode(db, key)
 	n.ln.SetStaticIP(ip)
-	if n.ln.Node().Seq() != 1 {
-		panic(fmt.Errorf("unexpected seq %d", n.ln.Node().Seq()))
-	}
-	n.c = NewCodec(n.ln, key, clock)
+	n.c = NewCodec(n.ln, key, clock, nil)
 }
 
 func (n *handshakeTestNode) encode(t testing.TB, to handshakeTestNode, p Packet) ([]byte, Nonce) {
@@ -558,7 +561,7 @@ func (n *handshakeTestNode) expectDecode(t *testing.T, ptype byte, p []byte) Pac
 
 func (n *handshakeTestNode) expectDecodeErr(t *testing.T, wantErr error, p []byte) {
 	t.Helper()
-	if _, err := n.decode(p); !reflect.DeepEqual(err, wantErr) {
+	if _, err := n.decode(p); !errors.Is(err, wantErr) {
 		t.Fatal(fmt.Errorf("(%s) got err %q, want %q", n.ln.ID().TerminalString(), err, wantErr))
 	}
 }
@@ -583,7 +586,7 @@ func (n *handshakeTestNode) id() enode.ID {
 // hexFile reads the given file and decodes the hex data contained in it.
 // Whitespace and any lines beginning with the # character are ignored.
 func hexFile(file string) []byte {
-	fileContent, err := ioutil.ReadFile(file)
+	fileContent, err := os.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}

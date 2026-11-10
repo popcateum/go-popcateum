@@ -1,25 +1,27 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rlp
 
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/rlp"
 )
@@ -38,6 +40,9 @@ func decodeEncode(input []byte, val interface{}, i int) {
 
 func Fuzz(input []byte) int {
 	if len(input) == 0 {
+		return 0
+	}
+	if len(input) > 500*1024 {
 		return 0
 	}
 
@@ -122,6 +127,17 @@ func Fuzz(input []byte) int {
 		i++
 		var rs types.Receipts
 		decodeEncode(input, &rs, i)
+	}
+	{
+		i++
+		var v struct {
+			AnIntPtr  *big.Int
+			AnInt     big.Int
+			AnU256Ptr *uint256.Int
+			AnU256    uint256.Int
+			NotAnU256 [4]uint64
+		}
+		decodeEncode(input, &v, i)
 	}
 	return 1
 }

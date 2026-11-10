@@ -1,26 +1,28 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package ethapi implements the general Popcateum API functions.
+// Package ethapi implements the general Ethereum API functions.
 package ethapi
 
 import (
 	"context"
 	"math/big"
+	"time"
 
+	ethereum "github.com/popcateum/go-popcateum"
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/consensus"
@@ -29,7 +31,6 @@ import (
 	"github.com/popcateum/go-popcateum/core/state"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/core/vm"
-	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/params"
@@ -39,15 +40,18 @@ import (
 // Backend interface provides the common API services (that are provided by
 // both full and light clients) with access to necessary functions.
 type Backend interface {
-	// General Popcateum API
-	Downloader() *downloader.Downloader
-	SuggestPrice(ctx context.Context) (*big.Int, error)
+	// General Ethereum API
+	SyncProgress() ethereum.SyncProgress
+
+	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
+	FeeHistory(ctx context.Context, blockCount uint64, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*big.Int, [][]*big.Int, []*big.Int, []float64, error)
 	ChainDb() ethdb.Database
 	AccountManager() *accounts.Manager
 	ExtRPCEnabled() bool
-	RPCGasCap() uint64        // global gas cap for eth_call over rpc: DoS protection
-	RPCTxFeeCap() float64     // global tx fee cap for all transaction related APIs
-	UnprotectedAllowed() bool // allows only for EIP155 transactions.
+	RPCGasCap() uint64            // global gas cap for eth_call over rpc: DoS protection
+	RPCEVMTimeout() time.Duration // global timeout for eth_call over rpc: DoS protection
+	RPCTxFeeCap() float64         // global tx fee cap for all transaction related APIs
+	UnprotectedAllowed() bool     // allows only for EIP155 transactions.
 
 	// Blockchain API
 	SetHead(number uint64)
@@ -55,15 +59,16 @@ type Backend interface {
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error)
 	CurrentHeader() *types.Header
-	CurrentBlock() *types.Block
+	CurrentBlock() *types.Header
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error)
+	PendingBlockAndReceipts() (*types.Block, types.Receipts)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
 	GetTd(ctx context.Context, hash common.Hash) *big.Int
-	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error)
+	GetEVM(ctx context.Context, msg *core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
@@ -76,18 +81,22 @@ type Backend interface {
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	Stats() (pending int, queued int)
 	TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
+	TxPoolContentFrom(addr common.Address) (types.Transactions, types.Transactions)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
-
-	// Filter API
-	BloomStatus() (uint64, uint64)
-	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
-	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
-	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
-	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
-	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
 
 	ChainConfig() *params.ChainConfig
 	Engine() consensus.Engine
+
+	// This is copied from filters.Backend
+	// eth/filters needs to be initialized from this backend type, so methods needed by
+	// it must also be included here.
+	GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error)
+	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
+	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
+	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
+	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
+	BloomStatus() (uint64, uint64)
+	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {
@@ -95,43 +104,25 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicPopcateumAPI(apiBackend),
-			Public:    true,
+			Service:   NewEthereumAPI(apiBackend),
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicBlockChainAPI(apiBackend),
-			Public:    true,
+			Service:   NewBlockChainAPI(apiBackend),
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicTransactionPoolAPI(apiBackend, nonceLock),
-			Public:    true,
+			Service:   NewTransactionAPI(apiBackend, nonceLock),
 		}, {
 			Namespace: "txpool",
-			Version:   "1.0",
-			Service:   NewPublicTxPoolAPI(apiBackend),
-			Public:    true,
+			Service:   NewTxPoolAPI(apiBackend),
 		}, {
 			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPublicDebugAPI(apiBackend),
-			Public:    true,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(apiBackend),
+			Service:   NewDebugAPI(apiBackend),
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicAccountAPI(apiBackend.AccountManager()),
-			Public:    true,
+			Service:   NewEthereumAccountAPI(apiBackend.AccountManager()),
 		}, {
 			Namespace: "personal",
-			Version:   "1.0",
-			Service:   NewPrivateAccountAPI(apiBackend, nonceLock),
-			Public:    false,
+			Service:   NewPersonalAccountAPI(apiBackend, nonceLock),
 		},
 	}
 }

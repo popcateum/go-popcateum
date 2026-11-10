@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snapshot
 
@@ -276,7 +276,7 @@ func (fi *fastIterator) next(idx int) bool {
 			return false
 		}
 		// The elem we're placing it next to has the same value,
-		// so whichever winds up on n+1 will need further iteraton
+		// so whichever winds up on n+1 will need further iteration
 		clash = n + 1
 
 		return cur.priority < fi.iterators[n+1].priority
@@ -319,7 +319,7 @@ func (fi *fastIterator) Slot() []byte {
 }
 
 // Release iterates over all the remaining live layer iterators and releases each
-// of thme individually.
+// of them individually.
 func (fi *fastIterator) Release() {
 	for _, it := range fi.iterators {
 		it.it.Release()
@@ -327,7 +327,7 @@ func (fi *fastIterator) Release() {
 	fi.iterators = nil
 }
 
-// Debug is a convencience helper during testing
+// Debug is a convenience helper during testing
 func (fi *fastIterator) Debug() {
 	for _, it := range fi.iterators {
 		fmt.Printf("[p=%v v=%v] ", it.priority, it.it.Hash()[0])

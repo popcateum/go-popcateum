@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package simulations
 
@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"sync"
 	"time"
@@ -236,7 +235,6 @@ func (net *Network) watchPeerEvents(id enode.ID, events chan *p2p.PeerEvent, sub
 			}
 			peer := event.Peer
 			switch event.Type {
-
 			case p2p.PeerEventTypeAdd:
 				net.DidConnect(id, peer)
 
@@ -248,7 +246,6 @@ func (net *Network) watchPeerEvents(id enode.ID, events chan *p2p.PeerEvent, sub
 
 			case p2p.PeerEventTypeMsgRecv:
 				net.DidReceive(peer, id, event.Protocol, *event.MsgCode)
-
 			}
 
 		case err := <-sub.Err():
@@ -649,8 +646,8 @@ func (net *Network) getConn(oneID, otherID enode.ID) *Conn {
 	return net.Conns[i]
 }
 
-// InitConn(one, other) retrieves the connection model for the connection between
-// peers one and other, or creates a new one if it does not exist
+// InitConn retrieves the connection model for the connection between
+// peers 'oneID' and 'otherID', or creates a new one if it does not exist
 // the order of nodes does not matter, i.e., Conn(i,j) == Conn(j, i)
 // it checks if the connection is already up, and if the nodes are running
 // NOTE:
@@ -694,12 +691,6 @@ func (net *Network) Shutdown() {
 		log.Debug("Stopping node", "id", node.ID())
 		if err := node.Stop(); err != nil {
 			log.Warn("Can't stop node", "id", node.ID(), "err", err)
-		}
-		// If the node has the close method, call it.
-		if closer, ok := node.Node.(io.Closer); ok {
-			if err := closer.Close(); err != nil {
-				log.Warn("Can't close node", "id", node.ID(), "err", err)
-			}
 		}
 	}
 	close(net.quitc)
@@ -795,7 +786,7 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 // status. IMPORTANT: The implementation is incomplete; we lose p2p.NodeInfo.
 func (n *Node) UnmarshalJSON(raw []byte) error {
 	// TODO: How should we turn back NodeInfo into n.Node?
-	// Ticket: https://github.com/popcatsphere/go-popcateum/issues/1177
+	// Ticket: https://github.com/ethersphere/go-ethereum/issues/1177
 	var node struct {
 		Config *adapters.NodeConfig `json:"config,omitempty"`
 		Up     bool                 `json:"up"`
@@ -934,7 +925,6 @@ func (net *Network) snapshot(addServices []string, removeServices []string) (*Sn
 				if !haveSvc {
 					cleanedServices = append(cleanedServices, svc)
 				}
-
 			}
 			snap.Nodes[i].Node.Config.Lifecycles = cleanedServices
 		}
@@ -1028,7 +1018,6 @@ func (net *Network) Load(snap *Snapshot) error {
 
 	// Start connecting.
 	for _, conn := range snap.Conns {
-
 		if !net.GetNode(conn.One).Up() || !net.GetNode(conn.Other).Up() {
 			//in this case, at least one of the nodes of a connection is not up,
 			//so it would result in the snapshot `Load` to fail

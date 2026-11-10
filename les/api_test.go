@@ -1,26 +1,26 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
 import (
 	"context"
+	crand "crypto/rand"
 	"errors"
 	"flag"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"sync"
@@ -28,12 +28,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattn/go-colorable"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/hexutil"
 	"github.com/popcateum/go-popcateum/consensus/ethash"
 	"github.com/popcateum/go-popcateum/eth"
-	"github.com/popcateum/go-popcateum/eth/downloader"
+	ethdownloader "github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/eth/ethconfig"
+	"github.com/popcateum/go-popcateum/les/downloader"
 	"github.com/popcateum/go-popcateum/les/flowcontrol"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/node"
@@ -41,7 +43,6 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/simulations"
 	"github.com/popcateum/go-popcateum/p2p/simulations/adapters"
 	"github.com/popcateum/go-popcateum/rpc"
-	"github.com/mattn/go-colorable"
 )
 
 // Additional command line flags for the test binary.
@@ -326,7 +327,7 @@ func getHead(ctx context.Context, t *testing.T, client *rpc.Client) (uint64, com
 func testRequest(ctx context.Context, t *testing.T, client *rpc.Client) bool {
 	var res string
 	var addr common.Address
-	rand.Read(addr[:])
+	crand.Read(addr[:])
 	c, cancel := context.WithTimeout(ctx, time.Second*12)
 	defer cancel()
 	err := client.CallContext(c, &res, "eth_getBalance", addr, "latest")
@@ -340,7 +341,6 @@ func freezeClient(ctx context.Context, t *testing.T, server *rpc.Client, clientI
 	if err := server.CallContext(ctx, nil, "debug_freezeClient", clientID); err != nil {
 		t.Fatalf("Failed to freeze client: %v", err)
 	}
-
 }
 
 func setCapacity(ctx context.Context, t *testing.T, server *rpc.Client, clientID enode.ID, cap uint64) {
@@ -422,7 +422,7 @@ func NewAdapter(adapterType string, services adapters.LifecycleConstructors) (ad
 		//	case "socket":
 		//		adapter = adapters.NewSocketAdapter(services)
 	case "exec":
-		baseDir, err0 := ioutil.TempDir("", "les-test")
+		baseDir, err0 := os.MkdirTemp("", "les-test")
 		if err0 != nil {
 			return nil, teardown, err0
 		}
@@ -494,23 +494,23 @@ func testSim(t *testing.T, serverCount, clientCount int, serverDir, clientDir []
 
 func newLesClientService(ctx *adapters.ServiceContext, stack *node.Node) (node.Lifecycle, error) {
 	config := ethconfig.Defaults
-	config.SyncMode = downloader.LightSync
+	config.SyncMode = (ethdownloader.SyncMode)(downloader.LightSync)
 	config.Ethash.PowMode = ethash.ModeFake
 	return New(stack, &config)
 }
 
 func newLesServerService(ctx *adapters.ServiceContext, stack *node.Node) (node.Lifecycle, error) {
 	config := ethconfig.Defaults
-	config.SyncMode = downloader.FullSync
+	config.SyncMode = (ethdownloader.SyncMode)(downloader.FullSync)
 	config.LightServ = testServerCapacity
 	config.LightPeers = testMaxClients
-	popcateum, err := eth.New(stack, &config)
+	ethereum, err := eth.New(stack, &config)
 	if err != nil {
 		return nil, err
 	}
-	_, err = NewLesServer(stack, popcateum, &config)
+	_, err = NewLesServer(stack, ethereum, &config)
 	if err != nil {
 		return nil, err
 	}
-	return popcateum, nil
+	return ethereum, nil
 }

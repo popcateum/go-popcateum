@@ -1,23 +1,22 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -92,7 +91,7 @@ func TestDAOForkBlockNewChain(t *testing.T) {
 		expectVote  bool
 	}{
 		// Test DAO Default Mainnet
-		{"", params.MainnetChainConfig.DAOForkBlock, true},
+		{"", params.MainnetChainConfig.DAOForkBlock, params.MainnetChainConfig.DAOForkSupport},
 		// test DAO Init Old Privnet
 		{daoOldGenesis, nil, false},
 		// test DAO Default No Fork Privnet
@@ -106,20 +105,19 @@ func TestDAOForkBlockNewChain(t *testing.T) {
 
 func testDAOForkBlockNewChain(t *testing.T, test int, genesis string, expectBlock *big.Int, expectVote bool) {
 	// Create a temporary data directory to use and inspect later
-	datadir := tmpdir(t)
-	defer os.RemoveAll(datadir)
+	datadir := t.TempDir()
 
-	// Start a Gpop instance with the requested flags set and immediately terminate
+	// Start a Geth instance with the requested flags set and immediately terminate
 	if genesis != "" {
 		json := filepath.Join(datadir, "genesis.json")
-		if err := ioutil.WriteFile(json, []byte(genesis), 0600); err != nil {
+		if err := os.WriteFile(json, []byte(genesis), 0600); err != nil {
 			t.Fatalf("test %d: failed to write genesis file: %v", test, err)
 		}
-		runGpop(t, "--datadir", datadir, "--networkid", "1337", "init", json).WaitExit()
+		runGeth(t, "--datadir", datadir, "--networkid", "1337", "init", json).WaitExit()
 	} else {
 		// Force chain initialization
-		args := []string{"--port", "0", "--networkid", "1337", "--maxpeers", "0", "--nodiscover", "--nat", "none", "--ipcdisable", "--datadir", datadir}
-		runGpop(t, append(args, []string{"--exec", "2+2", "console"}...)...).WaitExit()
+		args := []string{"--port", "0", "--authrpc.port", "0", "--networkid", "1337", "--maxpeers", "0", "--nodiscover", "--nat", "none", "--ipcdisable", "--datadir", datadir}
+		runGeth(t, append(args, []string{"--exec", "2+2", "console"}...)...).WaitExit()
 	}
 	// Retrieve the DAO config flag from the database
 	path := filepath.Join(datadir, "gpop", "chaindata")
@@ -129,7 +127,7 @@ func testDAOForkBlockNewChain(t *testing.T, test int, genesis string, expectBloc
 	}
 	defer db.Close()
 
-	genesisHash := common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
+	genesisHash := params.MainnetGenesisHash
 	if genesis != "" {
 		genesisHash = daoGenesisHash
 	}

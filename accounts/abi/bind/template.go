@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bind
 
@@ -75,8 +75,7 @@ type tmplStruct struct {
 // tmplSource is language to template mapping containing all the supported
 // programming languages the package can generate to.
 var tmplSource = map[Lang]string{
-	LangGo:   tmplSourceGo,
-	LangJava: tmplSourceJava,
+	LangGo: tmplSourceGo,
 }
 
 // tmplSourceGo is the Go source template that the generated Go contract binding
@@ -90,8 +89,9 @@ package {{.Package}}
 import (
 	"math/big"
 	"strings"
+	"errors"
 
-	popcateum "github.com/popcateum/go-popcateum"
+	ethereum "github.com/popcateum/go-popcateum"
 	"github.com/popcateum/go-popcateum/accounts/abi"
 	"github.com/popcateum/go-popcateum/accounts/abi/bind"
 	"github.com/popcateum/go-popcateum/common"
@@ -101,13 +101,15 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
-	_ = popcateum.NotFound
+	_ = ethereum.NotFound
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
 	_ = event.NewSubscription
+	_ = abi.ConvertType
 )
 
 {{$structs := .Structs}}
@@ -120,32 +122,48 @@ var (
 {{end}}
 
 {{range $contract := .Contracts}}
-	// {{.Type}}ABI is the input ABI used to generate the binding from.
-	const {{.Type}}ABI = "{{.InputABI}}"
-
-	{{if $contract.FuncSigs}}
-		// {{.Type}}FuncSigs maps the 4-byte function signature to its string representation.
-		var {{.Type}}FuncSigs = map[string]string{
+	// {{.Type}}MetaData contains all meta data concerning the {{.Type}} contract.
+	var {{.Type}}MetaData = &bind.MetaData{
+		ABI: "{{.InputABI}}",
+		{{if $contract.FuncSigs -}}
+		Sigs: map[string]string{
 			{{range $strsig, $binsig := .FuncSigs}}"{{$binsig}}": "{{$strsig}}",
 			{{end}}
-		}
+		},
+		{{end -}}
+		{{if .InputBin -}}
+		Bin: "0x{{.InputBin}}",
+		{{end}}
+	}
+	// {{.Type}}ABI is the input ABI used to generate the binding from.
+	// Deprecated: Use {{.Type}}MetaData.ABI instead.
+	var {{.Type}}ABI = {{.Type}}MetaData.ABI
+
+	{{if $contract.FuncSigs}}
+		// Deprecated: Use {{.Type}}MetaData.Sigs instead.
+		// {{.Type}}FuncSigs maps the 4-byte function signature to its string representation.
+		var {{.Type}}FuncSigs = {{.Type}}MetaData.Sigs
 	{{end}}
 
 	{{if .InputBin}}
 		// {{.Type}}Bin is the compiled bytecode used for deploying new contracts.
-		var {{.Type}}Bin = "0x{{.InputBin}}"
+		// Deprecated: Use {{.Type}}MetaData.Bin instead.
+		var {{.Type}}Bin = {{.Type}}MetaData.Bin
 
-		// Deploy{{.Type}} deploys a new Popcateum contract, binding an instance of {{.Type}} to it.
+		// Deploy{{.Type}} deploys a new Ethereum contract, binding an instance of {{.Type}} to it.
 		func Deploy{{.Type}}(auth *bind.TransactOpts, backend bind.ContractBackend {{range .Constructor.Inputs}}, {{.Name}} {{bindtype .Type $structs}}{{end}}) (common.Address, *types.Transaction, *{{.Type}}, error) {
-		  parsed, err := abi.JSON(strings.NewReader({{.Type}}ABI))
+		  parsed, err := {{.Type}}MetaData.GetAbi()
 		  if err != nil {
 		    return common.Address{}, nil, nil, err
 		  }
+		  if parsed == nil {
+			return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+		  }
 		  {{range $pattern, $name := .Libraries}}
 			{{decapitalise $name}}Addr, _, _, _ := Deploy{{capitalise $name}}(auth, backend)
-			{{$contract.Type}}Bin = strings.Replace({{$contract.Type}}Bin, "__${{$pattern}}$__", {{decapitalise $name}}Addr.String()[2:], -1)
+			{{$contract.Type}}Bin = strings.ReplaceAll({{$contract.Type}}Bin, "__${{$pattern}}$__", {{decapitalise $name}}Addr.String()[2:])
 		  {{end}}
-		  address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex({{.Type}}Bin), backend {{range .Constructor.Inputs}}, {{.Name}}{{end}})
+		  address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex({{.Type}}Bin), backend {{range .Constructor.Inputs}}, {{.Name}}{{end}})
 		  if err != nil {
 		    return common.Address{}, nil, nil, err
 		  }
@@ -153,29 +171,29 @@ var (
 		}
 	{{end}}
 
-	// {{.Type}} is an auto generated Go binding around an Popcateum contract.
+	// {{.Type}} is an auto generated Go binding around an Ethereum contract.
 	type {{.Type}} struct {
 	  {{.Type}}Caller     // Read-only binding to the contract
 	  {{.Type}}Transactor // Write-only binding to the contract
 	  {{.Type}}Filterer   // Log filterer for contract events
 	}
 
-	// {{.Type}}Caller is an auto generated read-only Go binding around an Popcateum contract.
+	// {{.Type}}Caller is an auto generated read-only Go binding around an Ethereum contract.
 	type {{.Type}}Caller struct {
 	  contract *bind.BoundContract // Generic contract wrapper for the low level calls
 	}
 
-	// {{.Type}}Transactor is an auto generated write-only Go binding around an Popcateum contract.
+	// {{.Type}}Transactor is an auto generated write-only Go binding around an Ethereum contract.
 	type {{.Type}}Transactor struct {
 	  contract *bind.BoundContract // Generic contract wrapper for the low level calls
 	}
 
-	// {{.Type}}Filterer is an auto generated log filtering Go binding around an Popcateum contract events.
+	// {{.Type}}Filterer is an auto generated log filtering Go binding around an Ethereum contract events.
 	type {{.Type}}Filterer struct {
 	  contract *bind.BoundContract // Generic contract wrapper for the low level calls
 	}
 
-	// {{.Type}}Session is an auto generated Go binding around an Popcateum contract,
+	// {{.Type}}Session is an auto generated Go binding around an Ethereum contract,
 	// with pre-set call and transact options.
 	type {{.Type}}Session struct {
 	  Contract     *{{.Type}}        // Generic contract binding to set the session for
@@ -183,31 +201,31 @@ var (
 	  TransactOpts bind.TransactOpts // Transaction auth options to use throughout this session
 	}
 
-	// {{.Type}}CallerSession is an auto generated read-only Go binding around an Popcateum contract,
+	// {{.Type}}CallerSession is an auto generated read-only Go binding around an Ethereum contract,
 	// with pre-set call options.
 	type {{.Type}}CallerSession struct {
 	  Contract *{{.Type}}Caller // Generic contract caller binding to set the session for
 	  CallOpts bind.CallOpts    // Call options to use throughout this session
 	}
 
-	// {{.Type}}TransactorSession is an auto generated write-only Go binding around an Popcateum contract,
+	// {{.Type}}TransactorSession is an auto generated write-only Go binding around an Ethereum contract,
 	// with pre-set transact options.
 	type {{.Type}}TransactorSession struct {
 	  Contract     *{{.Type}}Transactor // Generic contract transactor binding to set the session for
 	  TransactOpts bind.TransactOpts    // Transaction auth options to use throughout this session
 	}
 
-	// {{.Type}}Raw is an auto generated low-level Go binding around an Popcateum contract.
+	// {{.Type}}Raw is an auto generated low-level Go binding around an Ethereum contract.
 	type {{.Type}}Raw struct {
 	  Contract *{{.Type}} // Generic contract binding to access the raw methods on
 	}
 
-	// {{.Type}}CallerRaw is an auto generated low-level read-only Go binding around an Popcateum contract.
+	// {{.Type}}CallerRaw is an auto generated low-level read-only Go binding around an Ethereum contract.
 	type {{.Type}}CallerRaw struct {
 		Contract *{{.Type}}Caller // Generic read-only contract binding to access the raw methods on
 	}
 
-	// {{.Type}}TransactorRaw is an auto generated low-level write-only Go binding around an Popcateum contract.
+	// {{.Type}}TransactorRaw is an auto generated low-level write-only Go binding around an Ethereum contract.
 	type {{.Type}}TransactorRaw struct {
 		Contract *{{.Type}}Transactor // Generic write-only contract binding to access the raw methods on
 	}
@@ -250,11 +268,11 @@ var (
 
 	// bind{{.Type}} binds a generic wrapper to an already deployed contract.
 	func bind{{.Type}}(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	  parsed, err := abi.JSON(strings.NewReader({{.Type}}ABI))
+	  parsed, err := {{.Type}}MetaData.GetAbi()
 	  if err != nil {
 	    return nil, err
 	  }
-	  return bind.NewBoundContract(address, parsed, caller, transactor, filterer), nil
+	  return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 	}
 
 	// Call invokes the (constant) contract method with params as input values and
@@ -415,7 +433,7 @@ var (
 			event    string              // Event name to use for unpacking event data
 
 			logs chan types.Log        // Log channel receiving the found contract events
-			sub  popcateum.Subscription // Subscription for errors, completion and termination
+			sub  ethereum.Subscription // Subscription for errors, completion and termination
 			done bool                  // Whether the subscription completed delivering logs
 			fail error                 // Occurred error to stop iteration
 		}
@@ -549,142 +567,5 @@ var (
 		}
 
  	{{end}}
-{{end}}
-`
-
-// tmplSourceJava is the Java source template that the generated Java contract binding
-// is based on.
-const tmplSourceJava = `
-// This file is an automatically generated Java binding. Do not modify as any
-// change will likely be lost upon the next re-generation!
-
-package {{.Package}};
-
-import org.popcateum.gpop.*;
-import java.util.*;
-
-{{$structs := .Structs}}
-{{range $contract := .Contracts}}
-{{if not .Library}}public {{end}}class {{.Type}} {
-	// ABI is the input ABI used to generate the binding from.
-	public final static String ABI = "{{.InputABI}}";
-	{{if $contract.FuncSigs}}
-		// {{.Type}}FuncSigs maps the 4-byte function signature to its string representation.
-		public final static Map<String, String> {{.Type}}FuncSigs;
-		static {
-			Hashtable<String, String> temp = new Hashtable<String, String>();
-			{{range $strsig, $binsig := .FuncSigs}}temp.put("{{$binsig}}", "{{$strsig}}");
-			{{end}}
-			{{.Type}}FuncSigs = Collections.unmodifiableMap(temp);
-		}
-	{{end}}
-	{{if .InputBin}}
-	// BYTECODE is the compiled bytecode used for deploying new contracts.
-	public final static String BYTECODE = "0x{{.InputBin}}";
-
-	// deploy deploys a new Popcateum contract, binding an instance of {{.Type}} to it.
-	public static {{.Type}} deploy(TransactOpts auth, PopcateumClient client{{range .Constructor.Inputs}}, {{bindtype .Type $structs}} {{.Name}}{{end}}) throws Exception {
-		Interfaces args = Gpop.newInterfaces({{(len .Constructor.Inputs)}});
-		String bytecode = BYTECODE;
-		{{if .Libraries}}
-
-		// "link" contract to dependent libraries by deploying them first.
-		{{range $pattern, $name := .Libraries}}
-		{{capitalise $name}} {{decapitalise $name}}Inst = {{capitalise $name}}.deploy(auth, client);
-		bytecode = bytecode.replace("__${{$pattern}}$__", {{decapitalise $name}}Inst.Address.getHex().substring(2));
-		{{end}}
-		{{end}}
-		{{range $index, $element := .Constructor.Inputs}}Interface arg{{$index}} = Gpop.newInterface();arg{{$index}}.set{{namedtype (bindtype .Type $structs) .Type}}({{.Name}});args.set({{$index}},arg{{$index}});
-		{{end}}
-		return new {{.Type}}(Gpop.deployContract(auth, ABI, Gpop.decodeFromHex(bytecode), client, args));
-	}
-
-	// Internal constructor used by contract deployment.
-	private {{.Type}}(BoundContract deployment) {
-		this.Address  = deployment.getAddress();
-		this.Deployer = deployment.getDeployer();
-		this.Contract = deployment;
-	}
-	{{end}}
-
-	// Popcateum address where this contract is located at.
-	public final Address Address;
-
-	// Popcateum transaction in which this contract was deployed (if known!).
-	public final Transaction Deployer;
-
-	// Contract instance bound to a blockchain address.
-	private final BoundContract Contract;
-
-	// Creates a new instance of {{.Type}}, bound to a specific deployed contract.
-	public {{.Type}}(Address address, PopcateumClient client) throws Exception {
-		this(Gpop.bindContract(address, ABI, client));
-	}
-
-	{{range .Calls}}
-	{{if gt (len .Normalized.Outputs) 1}}
-	// {{capitalise .Normalized.Name}}Results is the output of a call to {{.Normalized.Name}}.
-	public class {{capitalise .Normalized.Name}}Results {
-		{{range $index, $item := .Normalized.Outputs}}public {{bindtype .Type $structs}} {{if ne .Name ""}}{{.Name}}{{else}}Return{{$index}}{{end}};
-		{{end}}
-	}
-	{{end}}
-
-	// {{.Normalized.Name}} is a free data retrieval call binding the contract method 0x{{printf "%x" .Original.ID}}.
-	//
-	// Solidity: {{.Original.String}}
-	public {{if gt (len .Normalized.Outputs) 1}}{{capitalise .Normalized.Name}}Results{{else if eq (len .Normalized.Outputs) 0}}void{{else}}{{range .Normalized.Outputs}}{{bindtype .Type $structs}}{{end}}{{end}} {{.Normalized.Name}}(CallOpts opts{{range .Normalized.Inputs}}, {{bindtype .Type $structs}} {{.Name}}{{end}}) throws Exception {
-		Interfaces args = Gpop.newInterfaces({{(len .Normalized.Inputs)}});
-		{{range $index, $item := .Normalized.Inputs}}Interface arg{{$index}} = Gpop.newInterface();arg{{$index}}.set{{namedtype (bindtype .Type $structs) .Type}}({{.Name}});args.set({{$index}},arg{{$index}});
-		{{end}}
-
-		Interfaces results = Gpop.newInterfaces({{(len .Normalized.Outputs)}});
-		{{range $index, $item := .Normalized.Outputs}}Interface result{{$index}} = Gpop.newInterface(); result{{$index}}.setDefault{{namedtype (bindtype .Type $structs) .Type}}(); results.set({{$index}}, result{{$index}});
-		{{end}}
-
-		if (opts == null) {
-			opts = Gpop.newCallOpts();
-		}
-		this.Contract.call(opts, results, "{{.Original.Name}}", args);
-		{{if gt (len .Normalized.Outputs) 1}}
-			{{capitalise .Normalized.Name}}Results result = new {{capitalise .Normalized.Name}}Results();
-			{{range $index, $item := .Normalized.Outputs}}result.{{if ne .Name ""}}{{.Name}}{{else}}Return{{$index}}{{end}} = results.get({{$index}}).get{{namedtype (bindtype .Type $structs) .Type}}();
-			{{end}}
-			return result;
-		{{else}}{{range .Normalized.Outputs}}return results.get(0).get{{namedtype (bindtype .Type $structs) .Type}}();{{end}}
-		{{end}}
-	}
-	{{end}}
-
-	{{range .Transacts}}
-	// {{.Normalized.Name}} is a paid mutator transaction binding the contract method 0x{{printf "%x" .Original.ID}}.
-	//
-	// Solidity: {{.Original.String}}
-	public Transaction {{.Normalized.Name}}(TransactOpts opts{{range .Normalized.Inputs}}, {{bindtype .Type $structs}} {{.Name}}{{end}}) throws Exception {
-		Interfaces args = Gpop.newInterfaces({{(len .Normalized.Inputs)}});
-		{{range $index, $item := .Normalized.Inputs}}Interface arg{{$index}} = Gpop.newInterface();arg{{$index}}.set{{namedtype (bindtype .Type $structs) .Type}}({{.Name}});args.set({{$index}},arg{{$index}});
-		{{end}}
-		return this.Contract.transact(opts, "{{.Original.Name}}"	, args);
-	}
-	{{end}}
-
-    {{if .Fallback}}
-	// Fallback is a paid mutator transaction binding the contract fallback function.
-	//
-	// Solidity: {{.Fallback.Original.String}}
-	public Transaction Fallback(TransactOpts opts, byte[] calldata) throws Exception { 
-		return this.Contract.rawTransact(opts, calldata);
-	}
-    {{end}}
-
-    {{if .Receive}}
-	// Receive is a paid mutator transaction binding the contract receive function.
-	//
-	// Solidity: {{.Receive.Original.String}}
-	public Transaction Receive(TransactOpts opts) throws Exception { 
-		return this.Contract.rawTransact(opts, null);
-	}
-    {{end}}
-}
 {{end}}
 `

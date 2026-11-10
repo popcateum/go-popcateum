@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -22,6 +22,7 @@ import (
 
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/eth/ethconfig"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/les/flowcontrol"
@@ -49,13 +50,13 @@ type ethBackend interface {
 	BloomIndexer() *core.ChainIndexer
 	ChainDb() ethdb.Database
 	Synced() bool
-	TxPool() *core.TxPool
+	TxPool() *txpool.TxPool
 }
 
 type LesServer struct {
 	lesCommons
 
-	archiveMode bool // Flag whether the popcateum node runs in archive mode.
+	archiveMode bool // Flag whether the ethereum node runs in archive mode.
 	handler     *serverHandler
 	peers       *clientPeerSet
 	serverset   *serverSet
@@ -140,7 +141,7 @@ func NewLesServer(node *node.Node, e ethBackend, config *ethconfig.Config) (*Les
 	srv.clientPool = vfs.NewClientPool(lesDb, srv.minCapacity, defaultConnectedBias, mclock.System{}, issync)
 	srv.clientPool.Start()
 	srv.clientPool.SetDefaultFactors(defaultPosFactors, defaultNegFactors)
-	srv.vfluxServer.Register(srv.clientPool, "les", "Popcateum light client service")
+	srv.vfluxServer.Register(srv.clientPool, "les", "Ethereum light client service")
 
 	checkpoint := srv.latestLocalCheckpoint()
 	if !checkpoint.Empty() {
@@ -159,21 +160,15 @@ func (s *LesServer) APIs() []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: "les",
-			Version:   "1.0",
-			Service:   NewPrivateLightAPI(&s.lesCommons),
-			Public:    false,
+			Service:   NewLightAPI(&s.lesCommons),
 		},
 		{
 			Namespace: "les",
-			Version:   "1.0",
-			Service:   NewPrivateLightServerAPI(s),
-			Public:    false,
+			Service:   NewLightServerAPI(s),
 		},
 		{
 			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(s),
-			Public:    false,
+			Service:   NewDebugAPI(s),
 		},
 	}
 }

@@ -1,18 +1,18 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -27,7 +27,6 @@ import (
 )
 
 // Tests that handshake failures are detected and reported correctly.
-func TestHandshake65(t *testing.T) { testHandshake(t, ETH65) }
 func TestHandshake66(t *testing.T) { testHandshake(t, ETH66) }
 
 func testHandshake(t *testing.T, protocol uint) {
@@ -40,8 +39,8 @@ func testHandshake(t *testing.T, protocol uint) {
 	var (
 		genesis = backend.chain.Genesis()
 		head    = backend.chain.CurrentBlock()
-		td      = backend.chain.GetTd(head.Hash(), head.NumberU64())
-		forkID  = forkid.NewID(backend.chain.Config(), backend.chain.Genesis().Hash(), backend.chain.CurrentHeader().Number.Uint64())
+		td      = backend.chain.GetTd(head.Hash(), head.Number.Uint64())
+		forkID  = forkid.NewID(backend.chain.Config(), backend.chain.Genesis().Hash(), backend.chain.CurrentHeader().Number.Uint64(), backend.chain.CurrentHeader().Time)
 	)
 	tests := []struct {
 		code uint64

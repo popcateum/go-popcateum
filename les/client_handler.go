@@ -1,24 +1,25 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
 import (
 	"context"
 	"math/big"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,8 +28,8 @@ import (
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/core/forkid"
 	"github.com/popcateum/go-popcateum/core/types"
-	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/eth/protocols/eth"
+	"github.com/popcateum/go-popcateum/les/downloader"
 	"github.com/popcateum/go-popcateum/light"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/p2p"
@@ -43,7 +44,7 @@ type clientHandler struct {
 	checkpoint *params.TrustedCheckpoint
 	fetcher    *lightFetcher
 	downloader *downloader.Downloader
-	backend    *LightPopcateum
+	backend    *LightEthereum
 
 	closeCh chan struct{}
 	wg      sync.WaitGroup // WaitGroup used to track all connected peers.
@@ -53,7 +54,7 @@ type clientHandler struct {
 	syncEnd   func(header *types.Header) // Hook called when the syncing is done
 }
 
-func newClientHandler(ulcServers []string, ulcFraction int, checkpoint *params.TrustedCheckpoint, backend *LightPopcateum) *clientHandler {
+func newClientHandler(ulcServers []string, ulcFraction int, checkpoint *params.TrustedCheckpoint, backend *LightEthereum) *clientHandler {
 	handler := &clientHandler{
 		forkFilter: forkid.NewFilter(backend.blockchain),
 		checkpoint: checkpoint,
@@ -73,7 +74,7 @@ func newClientHandler(ulcServers []string, ulcFraction int, checkpoint *params.T
 		height = (checkpoint.SectionIndex+1)*params.CHTFrequency - 1
 	}
 	handler.fetcher = newLightFetcher(backend.blockchain, backend.engine, backend.peers, handler.ulc, backend.chainDb, backend.reqDist, handler.synchronise)
-	handler.downloader = downloader.New(height, backend.chainDb, nil, backend.eventMux, nil, backend.blockchain, handler.removePeer)
+	handler.downloader = downloader.New(height, backend.chainDb, backend.eventMux, nil, backend.blockchain, handler.removePeer)
 	handler.backend.peers.subscribe((*downloaderPeerNotify)(handler))
 	return handler
 }
@@ -99,20 +100,20 @@ func (h *clientHandler) runPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter)
 	defer peer.close()
 	h.wg.Add(1)
 	defer h.wg.Done()
-	err := h.handle(peer)
+	err := h.handle(peer, false)
 	return err
 }
 
-func (h *clientHandler) handle(p *serverPeer) error {
+func (h *clientHandler) handle(p *serverPeer, noInitAnnounce bool) error {
 	if h.backend.peers.len() >= h.backend.config.LightPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
 	}
-	p.Log().Debug("Light Popcateum peer connected", "name", p.Name())
+	p.Log().Debug("Light Ethereum peer connected", "name", p.Name())
 
 	// Execute the LES handshake
-	forkid := forkid.NewID(h.backend.blockchain.Config(), h.backend.genesis, h.backend.blockchain.CurrentHeader().Number.Uint64())
+	forkid := forkid.NewID(h.backend.blockchain.Config(), h.backend.genesis, h.backend.blockchain.CurrentHeader().Number.Uint64(), h.backend.blockchain.CurrentHeader().Time)
 	if err := p.Handshake(h.backend.blockchain.Genesis().Hash(), forkid, h.forkFilter); err != nil {
-		p.Log().Debug("Light Popcateum handshake failed", "err", err)
+		p.Log().Debug("Light Ethereum handshake failed", "err", err)
 		return err
 	}
 	// Register peer with the server pool
@@ -130,7 +131,7 @@ func (h *clientHandler) handle(p *serverPeer) error {
 	}
 	// Register the peer locally
 	if err := h.backend.peers.register(p); err != nil {
-		p.Log().Error("Light Popcateum peer registration failed", "err", err)
+		p.Log().Error("Light Ethereum peer registration failed", "err", err)
 		return err
 	}
 
@@ -142,7 +143,12 @@ func (h *clientHandler) handle(p *serverPeer) error {
 		connectionTimer.Update(time.Duration(mclock.Now() - connectedAt))
 		serverConnectionGauge.Update(int64(h.backend.peers.len()))
 	}()
-	h.fetcher.announce(p, &announceData{Hash: p.headInfo.Hash, Number: p.headInfo.Number, Td: p.headInfo.Td})
+
+	// Discard all the announces after the transition
+	// Also discarding initial signal to prevent syncing during testing.
+	if !(noInitAnnounce || h.backend.merger.TDDReached()) {
+		h.fetcher.announce(p, &announceData{Hash: p.headInfo.Hash, Number: p.headInfo.Number, Td: p.headInfo.Td})
+	}
 
 	// Mark the peer starts to be served.
 	atomic.StoreUint32(&p.serving, 1)
@@ -151,7 +157,7 @@ func (h *clientHandler) handle(p *serverPeer) error {
 	// Spawn a main loop to handle all incoming messages.
 	for {
 		if err := h.handleMsg(p); err != nil {
-			p.Log().Debug("Light Popcateum message handling failed", "err", err)
+			p.Log().Debug("Light Ethereum message handling failed", "err", err)
 			p.fcServer.DumpLogs()
 			return err
 		}
@@ -166,7 +172,7 @@ func (h *clientHandler) handleMsg(p *serverPeer) error {
 	if err != nil {
 		return err
 	}
-	p.Log().Trace("Light Popcateum message arrived", "code", msg.Code, "bytes", msg.Size)
+	p.Log().Trace("Light Ethereum message arrived", "code", msg.Code, "bytes", msg.Size)
 
 	if msg.Size > ProtocolMaxMsgSize {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
@@ -208,7 +214,11 @@ func (h *clientHandler) handleMsg(p *serverPeer) error {
 
 			// Update peer head information first and then notify the announcement
 			p.updateHead(req.Hash, req.Number, req.Td)
-			h.fetcher.announce(p, &req)
+
+			// Discard all the announces after the transition
+			if !h.backend.merger.TDDReached() {
+				h.fetcher.announce(p, &req)
+			}
 		}
 	case msg.Code == BlockHeadersMsg:
 		p.Log().Trace("Received block header response message")
@@ -388,7 +398,7 @@ func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, s
 			return dp.(*serverPeer) == pc.peer
 		},
 		request: func(dp distPeer) func() {
-			reqID := genReqID()
+			reqID := rand.Uint64()
 			peer := dp.(*serverPeer)
 			cost := peer.getRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueuedRequest(reqID, cost)
@@ -412,7 +422,7 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
 			return dp.(*serverPeer) == pc.peer
 		},
 		request: func(dp distPeer) func() {
-			reqID := genReqID()
+			reqID := rand.Uint64()
 			peer := dp.(*serverPeer)
 			cost := peer.getRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueuedRequest(reqID, cost)
@@ -429,7 +439,7 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
 // RetrieveSingleHeaderByNumber requests a single header by the specified block
 // number. This function will wait the response until it's timeout or delivered.
 func (pc *peerConnection) RetrieveSingleHeaderByNumber(context context.Context, number uint64) (*types.Header, error) {
-	reqID := genReqID()
+	reqID := rand.Uint64()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
 			peer := dp.(*serverPeer)
@@ -471,7 +481,7 @@ func (d *downloaderPeerNotify) registerPeer(p *serverPeer) {
 		handler: h,
 		peer:    p,
 	}
-	h.downloader.RegisterLightPeer(p.id, eth.ETH65, pc)
+	h.downloader.RegisterLightPeer(p.id, eth.ETH66, pc)
 }
 
 func (d *downloaderPeerNotify) unregisterPeer(p *serverPeer) {

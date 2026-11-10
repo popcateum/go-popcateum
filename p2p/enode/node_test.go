@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package enode
 
@@ -47,7 +47,7 @@ func TestPythonInterop(t *testing.T) {
 		wantID  = HexID("a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7")
 		wantSeq = uint64(1)
 		wantIP  = enr.IPv4{127, 0, 0, 1}
-		wantUDP = enr.UDP(60606)
+		wantUDP = enr.UDP(30303)
 	)
 	if n.Seq() != wantSeq {
 		t.Errorf("wrong seq: got %d, want %d", n.Seq(), wantSeq)

@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package adapters
 
@@ -24,6 +24,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/node"
@@ -31,7 +32,6 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/p2p/simulations/pipes"
 	"github.com/popcateum/go-popcateum/rpc"
-	"github.com/gorilla/websocket"
 )
 
 // SimAdapter is a NodeAdapter which creates in-memory simulation nodes and
@@ -206,7 +206,7 @@ func (sn *SimNode) ServeRPC(conn *websocket.Conn) error {
 	if err != nil {
 		return err
 	}
-	codec := rpc.NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON)
+	codec := rpc.NewFuncCodec(conn, func(v any, _ bool) error { return conn.WriteJSON(v) }, conn.ReadJSON)
 	handler.ServeCodec(codec, 0)
 	return nil
 }

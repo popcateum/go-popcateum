@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package state
 
@@ -28,19 +28,19 @@ type journalEntry interface {
 	// revert undoes the changes introduced by this journal entry.
 	revert(*StateDB)
 
-	// dirtied returns the Popcateum address modified by this journal entry.
+	// dirtied returns the Ethereum address modified by this journal entry.
 	dirtied() *common.Address
 }
 
 // journal contains the list of state modifications applied since the last state
-// commit. These are tracked to be able to be reverted in case of an execution
-// exception or revertal request.
+// commit. These are tracked to be able to be reverted in the case of an execution
+// exception or request for reversal.
 type journal struct {
 	entries []journalEntry         // Current changes tracked by the journal
 	dirties map[common.Address]int // Dirty accounts and the number of changes
 }
 
-// newJournal create a new initialized journal.
+// newJournal creates a new initialized journal.
 func newJournal() *journal {
 	return &journal{
 		dirties: make(map[common.Address]int),
@@ -138,6 +138,11 @@ type (
 		address *common.Address
 		slot    *common.Hash
 	}
+
+	transientStorageChange struct {
+		account       *common.Address
+		key, prevalue common.Hash
+	}
 )
 
 func (ch createObjectChange) revert(s *StateDB) {
@@ -151,8 +156,8 @@ func (ch createObjectChange) dirtied() *common.Address {
 
 func (ch resetObjectChange) revert(s *StateDB) {
 	s.setStateObject(ch.prev)
-	if !ch.prevdestruct && s.snap != nil {
-		delete(s.snapDestructs, ch.prev.addrHash)
+	if !ch.prevdestruct {
+		delete(s.stateObjectsDestruct, ch.prev.address)
 	}
 }
 
@@ -211,6 +216,14 @@ func (ch storageChange) revert(s *StateDB) {
 
 func (ch storageChange) dirtied() *common.Address {
 	return ch.account
+}
+
+func (ch transientStorageChange) revert(s *StateDB) {
+	s.setTransientState(*ch.account, ch.key, ch.prevalue)
+}
+
+func (ch transientStorageChange) dirtied() *common.Address {
+	return nil
 }
 
 func (ch refundChange) revert(s *StateDB) {

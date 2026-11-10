@@ -1,23 +1,24 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package abi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -78,16 +79,10 @@ func (arguments Arguments) isTuple() bool {
 // Unpack performs the operation hexdata -> Go format.
 func (arguments Arguments) Unpack(data []byte) ([]interface{}, error) {
 	if len(data) == 0 {
-		if len(arguments) != 0 {
-			return nil, fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected")
+		if len(arguments.NonIndexed()) != 0 {
+			return nil, errors.New("abi: attempting to unmarshall an empty string while arguments are expected")
 		}
-		// Nothing to unmarshal, return default variables
-		nonIndexedArgs := arguments.NonIndexed()
-		defaultVars := make([]interface{}, len(nonIndexedArgs))
-		for index, arg := range nonIndexedArgs {
-			defaultVars[index] = reflect.New(arg.Type.GetType())
-		}
-		return defaultVars, nil
+		return make([]interface{}, 0), nil
 	}
 	return arguments.UnpackValues(data)
 }
@@ -96,11 +91,11 @@ func (arguments Arguments) Unpack(data []byte) ([]interface{}, error) {
 func (arguments Arguments) UnpackIntoMap(v map[string]interface{}, data []byte) error {
 	// Make sure map is not nil
 	if v == nil {
-		return fmt.Errorf("abi: cannot unpack into a nil map")
+		return errors.New("abi: cannot unpack into a nil map")
 	}
 	if len(data) == 0 {
-		if len(arguments) != 0 {
-			return fmt.Errorf("abi: attempting to unmarshall an empty string while arguments are expected")
+		if len(arguments.NonIndexed()) != 0 {
+			return errors.New("abi: attempting to unmarshall an empty string while arguments are expected")
 		}
 		return nil // Nothing to unmarshal, return
 	}
@@ -121,8 +116,8 @@ func (arguments Arguments) Copy(v interface{}, values []interface{}) error {
 		return fmt.Errorf("abi: Unpack(non-pointer %T)", v)
 	}
 	if len(values) == 0 {
-		if len(arguments) != 0 {
-			return fmt.Errorf("abi: attempting to copy no values while %d arguments are expected", len(arguments))
+		if len(arguments.NonIndexed()) != 0 {
+			return errors.New("abi: attempting to copy no values while arguments are expected")
 		}
 		return nil // Nothing to copy, return
 	}
@@ -137,7 +132,7 @@ func (arguments Arguments) copyAtomic(v interface{}, marshalledValues interface{
 	dst := reflect.ValueOf(v).Elem()
 	src := reflect.ValueOf(marshalledValues)
 
-	if dst.Kind() == reflect.Struct && src.Kind() != reflect.Struct {
+	if dst.Kind() == reflect.Struct {
 		return set(dst.Field(0), src)
 	}
 	return set(dst, src)
@@ -192,6 +187,9 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 	virtualArgs := 0
 	for index, arg := range nonIndexedArgs {
 		marshalledValue, err := toGoType((index+virtualArgs)*32, arg.Type, data)
+		if err != nil {
+			return nil, err
+		}
 		if arg.Type.T == ArrayTy && !isDynamicType(arg.Type) {
 			// If we have a static array, like [3]uint256, these are coded as
 			// just like uint256,uint256,uint256.
@@ -208,9 +206,6 @@ func (arguments Arguments) UnpackValues(data []byte) ([]interface{}, error) {
 			// If we have a static tuple, like (uint256, bool, uint256), these are
 			// coded as just like uint256,bool,uint256
 			virtualArgs += getTypeSize(arg.Type)/32 - 1
-		}
-		if err != nil {
-			return nil, err
 		}
 		retval = append(retval, marshalledValue)
 	}

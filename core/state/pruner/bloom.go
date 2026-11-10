@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package pruner
 
@@ -21,10 +21,10 @@ import (
 	"errors"
 	"os"
 
+	bloomfilter "github.com/holiman/bloomfilter/v2"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/log"
-	bloomfilter "github.com/holiman/bloomfilter/v2"
 )
 
 // stateBloomHasher is a wrapper around a byte blob to satisfy the interface API
@@ -39,7 +39,7 @@ func (f stateBloomHasher) BlockSize() int                    { panic("not implem
 func (f stateBloomHasher) Size() int                         { return 8 }
 func (f stateBloomHasher) Sum64() uint64                     { return binary.BigEndian.Uint64(f) }
 
-// stateBloom is a bloom filter used during the state convesion(snapshot->state).
+// stateBloom is a bloom filter used during the state conversion(snapshot->state).
 // The keys of all generated entries will be recorded here so that in the pruning
 // stage the entries belong to the specific version can be avoided for deletion.
 //
@@ -90,7 +90,7 @@ func (bloom *stateBloom) Commit(filename, tempname string) error {
 		return err
 	}
 	// Ensure the file is synced to disk
-	f, err := os.Open(tempname)
+	f, err := os.OpenFile(tempname, os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (bloom *stateBloom) Commit(filename, tempname string) error {
 	}
 	f.Close()
 
-	// Move the teporary file into it's final location
+	// Move the temporary file into it's final location
 	return os.Rename(tempname, filename)
 }
 

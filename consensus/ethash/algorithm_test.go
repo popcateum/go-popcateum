@@ -1,25 +1,24 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
 import (
 	"bytes"
 	"encoding/binary"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"reflect"
@@ -698,7 +697,9 @@ func TestHashimoto(t *testing.T) {
 // Tests that caches generated on disk may be done concurrently.
 func TestConcurrentDiskCacheGeneration(t *testing.T) {
 	// Create a temp folder to generate the caches into
-	cachedir, err := ioutil.TempDir("", "")
+	// TODO: t.TempDir fails to remove the directory on Windows
+	// \AppData\Local\Temp\1\TestConcurrentDiskCacheGeneration2382060137\001\cache-R23-1dca8a85e74aa763: Access is denied.
+	cachedir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Failed to create temporary cache dir: %v", err)
 	}
@@ -708,11 +709,11 @@ func TestConcurrentDiskCacheGeneration(t *testing.T) {
 	block := types.NewBlockWithHeader(&types.Header{
 		Number:      big.NewInt(3311058),
 		ParentHash:  common.HexToHash("0xd783efa4d392943503f28438ad5830b2d5964696ffc285f338585e9fe0a37a05"),
-		UncleHash:   common.HexToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+		UncleHash:   types.EmptyUncleHash,
 		Coinbase:    common.HexToAddress("0xc0ea08a2d404d3172d2add29a45be56da40e2949"),
 		Root:        common.HexToHash("0x77d14e10470b5850332524f8cd6f69ad21f070ce92dca33ab2858300242ef2f1"),
-		TxHash:      common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
-		ReceiptHash: common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"),
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
 		Difficulty:  big.NewInt(167925187834220),
 		GasLimit:    4015682,
 		GasUsed:     0,
@@ -794,11 +795,7 @@ func BenchmarkHashimotoFullSmall(b *testing.B) {
 
 func benchmarkHashimotoFullMmap(b *testing.B, name string, lock bool) {
 	b.Run(name, func(b *testing.B) {
-		tmpdir, err := ioutil.TempDir("", "ethash-test")
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer os.RemoveAll(tmpdir)
+		tmpdir := b.TempDir()
 
 		d := &dataset{epoch: 0}
 		d.generate(tmpdir, 1, lock, false)

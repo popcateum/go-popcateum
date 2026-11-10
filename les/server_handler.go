@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -27,7 +27,7 @@ import (
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/forkid"
 	"github.com/popcateum/go-popcateum/core/rawdb"
-	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/les/flowcontrol"
@@ -63,7 +63,7 @@ type serverHandler struct {
 	forkFilter forkid.Filter
 	blockchain *core.BlockChain
 	chainDb    ethdb.Database
-	txpool     *core.TxPool
+	txpool     *txpool.TxPool
 	server     *LesServer
 
 	closeCh chan struct{}  // Channel used to exit all background routines of handler.
@@ -74,7 +74,7 @@ type serverHandler struct {
 	addTxsSync bool
 }
 
-func newServerHandler(server *LesServer, blockchain *core.BlockChain, chainDb ethdb.Database, txpool *core.TxPool, synced func() bool) *serverHandler {
+func newServerHandler(server *LesServer, blockchain *core.BlockChain, chainDb ethdb.Database, txpool *txpool.TxPool, synced func() bool) *serverHandler {
 	handler := &serverHandler{
 		forkFilter: forkid.NewFilter(blockchain),
 		server:     server,
@@ -109,7 +109,7 @@ func (h *serverHandler) runPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter)
 }
 
 func (h *serverHandler) handle(p *clientPeer) error {
-	p.Log().Debug("Light Popcateum peer connected", "name", p.Name())
+	p.Log().Debug("Light Ethereum peer connected", "name", p.Name())
 
 	// Execute the LES handshake
 	var (
@@ -117,10 +117,10 @@ func (h *serverHandler) handle(p *clientPeer) error {
 		hash   = head.Hash()
 		number = head.Number.Uint64()
 		td     = h.blockchain.GetTd(hash, number)
-		forkID = forkid.NewID(h.blockchain.Config(), h.blockchain.Genesis().Hash(), h.blockchain.CurrentBlock().NumberU64())
+		forkID = forkid.NewID(h.blockchain.Config(), h.blockchain.Genesis().Hash(), number, head.Time)
 	)
 	if err := p.Handshake(td, hash, number, h.blockchain.Genesis().Hash(), forkID, h.forkFilter, h.server); err != nil {
-		p.Log().Debug("Light Popcateum handshake failed", "err", err)
+		p.Log().Debug("Light Ethereum handshake failed", "err", err)
 		return err
 	}
 	// Connected to another server, no messages expected, just wait for disconnection
@@ -171,12 +171,12 @@ func (h *serverHandler) handle(p *clientPeer) error {
 	for {
 		select {
 		case err := <-p.errCh:
-			p.Log().Debug("Failed to send light popcateum response", "err", err)
+			p.Log().Debug("Failed to send light ethereum response", "err", err)
 			return err
 		default:
 		}
 		if err := h.handleMsg(p, &wg); err != nil {
-			p.Log().Debug("Light Popcateum message handling failed", "err", err)
+			p.Log().Debug("Light Ethereum message handling failed", "err", err)
 			return err
 		}
 	}
@@ -274,7 +274,7 @@ func (h *serverHandler) handleMsg(p *clientPeer, wg *sync.WaitGroup) error {
 	if err != nil {
 		return err
 	}
-	p.Log().Trace("Light Popcateum message arrived", "code", msg.Code, "bytes", msg.Size)
+	p.Log().Trace("Light Ethereum message arrived", "code", msg.Code, "bytes", msg.Size)
 
 	// Discard large message which exceeds the limitation.
 	if msg.Size > ProtocolMaxMsgSize {
@@ -344,7 +344,7 @@ func (h *serverHandler) BlockChain() *core.BlockChain {
 }
 
 // TxPool implements serverBackend
-func (h *serverHandler) TxPool() *core.TxPool {
+func (h *serverHandler) TxPool() *txpool.TxPool {
 	return h.txpool
 }
 
@@ -359,23 +359,23 @@ func (h *serverHandler) AddTxsSync() bool {
 }
 
 // getAccount retrieves an account from the state based on root.
-func getAccount(triedb *trie.Database, root, hash common.Hash) (state.Account, error) {
-	trie, err := trie.New(root, triedb)
+func getAccount(triedb *trie.Database, root, hash common.Hash) (types.StateAccount, error) {
+	trie, err := trie.New(trie.StateTrieID(root), triedb)
 	if err != nil {
-		return state.Account{}, err
+		return types.StateAccount{}, err
 	}
-	blob, err := trie.TryGet(hash[:])
+	blob, err := trie.Get(hash[:])
 	if err != nil {
-		return state.Account{}, err
+		return types.StateAccount{}, err
 	}
-	var account state.Account
-	if err = rlp.DecodeBytes(blob, &account); err != nil {
-		return state.Account{}, err
+	var acc types.StateAccount
+	if err = rlp.DecodeBytes(blob, &acc); err != nil {
+		return types.StateAccount{}, err
 	}
-	return account, nil
+	return acc, nil
 }
 
-// getHelperTrie returns the post-processed trie root for the given trie ID and section index
+// GetHelperTrie returns the post-processed trie root for the given trie ID and section index
 func (h *serverHandler) GetHelperTrie(typ uint, index uint64) *trie.Trie {
 	var (
 		root   common.Hash
@@ -384,15 +384,15 @@ func (h *serverHandler) GetHelperTrie(typ uint, index uint64) *trie.Trie {
 	switch typ {
 	case htCanonical:
 		sectionHead := rawdb.ReadCanonicalHash(h.chainDb, (index+1)*h.server.iConfig.ChtSize-1)
-		root, prefix = light.GetChtRoot(h.chainDb, index, sectionHead), light.ChtTablePrefix
+		root, prefix = light.GetChtRoot(h.chainDb, index, sectionHead), string(rawdb.ChtTablePrefix)
 	case htBloomBits:
 		sectionHead := rawdb.ReadCanonicalHash(h.chainDb, (index+1)*h.server.iConfig.BloomTrieSize-1)
-		root, prefix = light.GetBloomTrieRoot(h.chainDb, index, sectionHead), light.BloomTrieTablePrefix
+		root, prefix = light.GetBloomTrieRoot(h.chainDb, index, sectionHead), string(rawdb.BloomTrieTablePrefix)
 	}
 	if root == (common.Hash{}) {
 		return nil
 	}
-	trie, _ := trie.New(root, trie.NewDatabase(rawdb.NewTable(h.chainDb, prefix)))
+	trie, _ := trie.New(trie.TrieID(root), trie.NewDatabase(rawdb.NewTable(h.chainDb, prefix)))
 	return trie
 }
 
@@ -408,7 +408,7 @@ func (h *serverHandler) broadcastLoop() {
 	defer headSub.Unsubscribe()
 
 	var (
-		lastHead *types.Header
+		lastHead = h.blockchain.CurrentHeader()
 		lastTd   = common.Big0
 	)
 	for {
@@ -422,7 +422,10 @@ func (h *serverHandler) broadcastLoop() {
 			}
 			var reorg uint64
 			if lastHead != nil {
-				reorg = lastHead.Number.Uint64() - rawdb.FindCommonAncestor(h.chainDb, header, lastHead).Number.Uint64()
+				// If a setHead has been performed, the common ancestor can be nil.
+				if ancestor := rawdb.FindCommonAncestor(h.chainDb, header, lastHead); ancestor != nil {
+					reorg = lastHead.Number.Uint64() - ancestor.Number.Uint64()
+				}
 			}
 			lastHead, lastTd = header, td
 			log.Debug("Announcing block to peers", "number", number, "hash", hash, "td", td, "reorg", reorg)

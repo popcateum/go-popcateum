@@ -1,20 +1,20 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package types contains data types related to Popcateum consensus.
+// Package types contains data types related to Ethereum consensus.
 package types
 
 import (
@@ -29,11 +29,6 @@ import (
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/hexutil"
 	"github.com/popcateum/go-popcateum/rlp"
-)
-
-var (
-	EmptyRootHash  = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-	EmptyUncleHash = rlpHash([]*Header(nil))
 )
 
 // A BlockNonce is a 64-bit hash which proves (combined with the
@@ -63,13 +58,14 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("BlockNonce", input, n[:])
 }
 
-//go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
+//go:generate go run github.com/fjl/gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
+//go:generate go run ../../rlp/rlpgen -type Header -out gen_header_rlp.go
 
-// Header represents a block header in the Popcateum blockchain.
+// Header represents a block header in the Ethereum blockchain.
 type Header struct {
 	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
 	UncleHash   common.Hash    `json:"sha3Uncles"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
+	Coinbase    common.Address `json:"miner"`
 	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
@@ -82,6 +78,21 @@ type Header struct {
 	Extra       []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
+
+	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
+	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
+
+	// WithdrawalsHash was added by EIP-4895 and is ignored in legacy headers.
+	WithdrawalsHash *common.Hash `json:"withdrawalsRoot" rlp:"optional"`
+
+	// ExcessDataGas was added by EIP-4844 and is ignored in legacy headers.
+	ExcessDataGas *big.Int `json:"excessDataGas" rlp:"optional"`
+
+	/*
+		TODO (MariusVanDerWijden) Add this field once needed
+		// Random was added during the merge and contains the BeaconState randomness
+		Random common.Hash `json:"random" rlp:"optional"`
+	*/
 }
 
 // field type overrides for gencodec
@@ -92,6 +103,7 @@ type headerMarshaling struct {
 	GasUsed    hexutil.Uint64
 	Time       hexutil.Uint64
 	Extra      hexutil.Bytes
+	BaseFee    *hexutil.Big
 	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
@@ -106,7 +118,11 @@ var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
-	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
+	var baseFeeBits int
+	if h.BaseFee != nil {
+		baseFeeBits = h.BaseFee.BitLen()
+	}
+	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+baseFeeBits)/8)
 }
 
 // SanityCheck checks a few basic things -- these checks are way beyond what
@@ -125,18 +141,26 @@ func (h *Header) SanityCheck() error {
 	if eLen := len(h.Extra); eLen > 100*1024 {
 		return fmt.Errorf("too large block extradata: size %d", eLen)
 	}
+	if h.BaseFee != nil {
+		if bfLen := h.BaseFee.BitLen(); bfLen > 256 {
+			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
+		}
+	}
 	return nil
 }
 
 // EmptyBody returns true if there is no additional 'body' to complete the header
-// that is: no transactions and no uncles.
+// that is: no transactions, no uncles and no withdrawals.
 func (h *Header) EmptyBody() bool {
-	return h.TxHash == EmptyRootHash && h.UncleHash == EmptyUncleHash
+	if h.WithdrawalsHash == nil {
+		return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash
+	}
+	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash && *h.WithdrawalsHash == EmptyWithdrawalsHash
 }
 
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
-	return h.ReceiptHash == EmptyRootHash
+	return h.ReceiptHash == EmptyReceiptsHash
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -144,21 +168,19 @@ func (h *Header) EmptyReceipts() bool {
 type Body struct {
 	Transactions []*Transaction
 	Uncles       []*Header
+	Withdrawals  []*Withdrawal `rlp:"optional"`
 }
 
-// Block represents an entire block in the Popcateum blockchain.
+// Block represents an entire block in the Ethereum blockchain.
 type Block struct {
 	header       *Header
 	uncles       []*Header
 	transactions Transactions
+	withdrawals  Withdrawals
 
 	// caches
 	hash atomic.Value
 	size atomic.Value
-
-	// Td is used by package core to store the total difficulty
-	// of the chain up to and including the block.
-	td *big.Int
 
 	// These fields are used by package eth to track
 	// inter-peer block relay.
@@ -168,9 +190,10 @@ type Block struct {
 
 // "external" block encoding. used for eth protocol, etc.
 type extblock struct {
-	Header *Header
-	Txs    []*Transaction
-	Uncles []*Header
+	Header      *Header
+	Txs         []*Transaction
+	Uncles      []*Header
+	Withdrawals []*Withdrawal `rlp:"optional"`
 }
 
 // NewBlock creates a new block. The input data is copied,
@@ -181,11 +204,11 @@ type extblock struct {
 // are ignored and set to values derived from the given txs, uncles
 // and receipts.
 func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, hasher TrieHasher) *Block {
-	b := &Block{header: CopyHeader(header), td: new(big.Int)}
+	b := &Block{header: CopyHeader(header)}
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
-		b.header.TxHash = EmptyRootHash
+		b.header.TxHash = EmptyTxsHash
 	} else {
 		b.header.TxHash = DeriveSha(Transactions(txs), hasher)
 		b.transactions = make(Transactions, len(txs))
@@ -193,7 +216,7 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	}
 
 	if len(receipts) == 0 {
-		b.header.ReceiptHash = EmptyRootHash
+		b.header.ReceiptHash = EmptyReceiptsHash
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
 		b.header.Bloom = CreateBloom(receipts)
@@ -210,6 +233,28 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	}
 
 	return b
+}
+
+// NewBlockWithWithdrawals creates a new block with withdrawals. The input data
+// is copied, changes to header and to the field values will not
+// affect the block.
+//
+// The values of TxHash, UncleHash, ReceiptHash and Bloom in header
+// are ignored and set to values derived from the given txs, uncles
+// and receipts.
+func NewBlockWithWithdrawals(header *Header, txs []*Transaction, uncles []*Header, receipts []*Receipt, withdrawals []*Withdrawal, hasher TrieHasher) *Block {
+	b := NewBlock(header, txs, uncles, receipts, hasher)
+
+	if withdrawals == nil {
+		b.header.WithdrawalsHash = nil
+	} else if len(withdrawals) == 0 {
+		b.header.WithdrawalsHash = &EmptyWithdrawalsHash
+	} else {
+		h := DeriveSha(Withdrawals(withdrawals), hasher)
+		b.header.WithdrawalsHash = &h
+	}
+
+	return b.WithWithdrawals(withdrawals)
 }
 
 // NewBlockWithHeader creates a block with the given header data. The
@@ -229,31 +274,39 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
+	if h.BaseFee != nil {
+		cpy.BaseFee = new(big.Int).Set(h.BaseFee)
+	}
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
 	}
+	if h.WithdrawalsHash != nil {
+		cpy.WithdrawalsHash = new(common.Hash)
+		*cpy.WithdrawalsHash = *h.WithdrawalsHash
+	}
 	return &cpy
 }
 
-// DecodeRLP decodes the Popcateum
+// DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	var eb extblock
 	_, size, _ := s.Kind()
 	if err := s.Decode(&eb); err != nil {
 		return err
 	}
-	b.header, b.uncles, b.transactions = eb.Header, eb.Uncles, eb.Txs
-	b.size.Store(common.StorageSize(rlp.ListSize(size)))
+	b.header, b.uncles, b.transactions, b.withdrawals = eb.Header, eb.Uncles, eb.Txs, eb.Withdrawals
+	b.size.Store(rlp.ListSize(size))
 	return nil
 }
 
-// EncodeRLP serializes b into the Popcateum RLP block format.
+// EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, extblock{
-		Header: b.header,
-		Txs:    b.transactions,
-		Uncles: b.uncles,
+		Header:      b.header,
+		Txs:         b.transactions,
+		Uncles:      b.uncles,
+		Withdrawals: b.withdrawals,
 	})
 }
 
@@ -289,21 +342,32 @@ func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
 
+func (b *Block) BaseFee() *big.Int {
+	if b.header.BaseFee == nil {
+		return nil
+	}
+	return new(big.Int).Set(b.header.BaseFee)
+}
+
+func (b *Block) Withdrawals() Withdrawals {
+	return b.withdrawals
+}
+
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
-func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
+func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles, b.withdrawals} }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
-// and returning it, or returning a previsouly cached value.
-func (b *Block) Size() common.StorageSize {
+// and returning it, or returning a previously cached value.
+func (b *Block) Size() uint64 {
 	if size := b.size.Load(); size != nil {
-		return size.(common.StorageSize)
+		return size.(uint64)
 	}
 	c := writeCounter(0)
 	rlp.Encode(&c, b)
-	b.size.Store(common.StorageSize(c))
-	return common.StorageSize(c)
+	b.size.Store(uint64(c))
+	return uint64(c)
 }
 
 // SanityCheck can be used to prevent that unbounded fields are
@@ -312,7 +376,7 @@ func (b *Block) SanityCheck() error {
 	return b.header.SanityCheck()
 }
 
-type writeCounter common.StorageSize
+type writeCounter uint64
 
 func (c *writeCounter) Write(b []byte) (int, error) {
 	*c += writeCounter(len(b))
@@ -335,6 +399,7 @@ func (b *Block) WithSeal(header *Header) *Block {
 		header:       &cpy,
 		transactions: b.transactions,
 		uncles:       b.uncles,
+		withdrawals:  b.withdrawals,
 	}
 }
 
@@ -352,6 +417,15 @@ func (b *Block) WithBody(transactions []*Transaction, uncles []*Header) *Block {
 	return block
 }
 
+// WithWithdrawals sets the withdrawal contents of a block, does not return a new block.
+func (b *Block) WithWithdrawals(withdrawals []*Withdrawal) *Block {
+	if withdrawals != nil {
+		b.withdrawals = make([]*Withdrawal, len(withdrawals))
+		copy(b.withdrawals, withdrawals)
+	}
+	return b
+}
+
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() common.Hash {
@@ -364,3 +438,21 @@ func (b *Block) Hash() common.Hash {
 }
 
 type Blocks []*Block
+
+// HeaderParentHashFromRLP returns the parentHash of an RLP-encoded
+// header. If 'header' is invalid, the zero hash is returned.
+func HeaderParentHashFromRLP(header []byte) common.Hash {
+	// parentHash is the first list element.
+	listContent, _, err := rlp.SplitList(header)
+	if err != nil {
+		return common.Hash{}
+	}
+	parentHash, _, err := rlp.SplitString(listContent)
+	if err != nil {
+		return common.Hash{}
+	}
+	if len(parentHash) != 32 {
+		return common.Hash{}
+	}
+	return common.BytesToHash(parentHash)
+}

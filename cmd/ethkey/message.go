@@ -1,43 +1,44 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 
+	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/accounts/keystore"
 	"github.com/popcateum/go-popcateum/cmd/utils"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/crypto"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
 type outputSign struct {
 	Signature string
 }
 
-var msgfileFlag = cli.StringFlag{
+var msgfileFlag = &cli.StringFlag{
 	Name:  "msgfile",
 	Usage: "file containing the message to sign/verify",
 }
 
-var commandSignMessage = cli.Command{
+var commandSignMessage = &cli.Command{
 	Name:      "signmessage",
 	Usage:     "sign a message",
 	ArgsUsage: "<keyfile> <message>",
@@ -56,7 +57,7 @@ To sign a message contained in a file, use the --msgfile flag.
 
 		// Load the keyfile.
 		keyfilepath := ctx.Args().First()
-		keyjson, err := ioutil.ReadFile(keyfilepath)
+		keyjson, err := os.ReadFile(keyfilepath)
 		if err != nil {
 			utils.Fatalf("Failed to read the keyfile at '%s': %v", keyfilepath, err)
 		}
@@ -68,7 +69,7 @@ To sign a message contained in a file, use the --msgfile flag.
 			utils.Fatalf("Error decrypting key: %v", err)
 		}
 
-		signature, err := crypto.Sign(signHash(message), key.PrivateKey)
+		signature, err := crypto.Sign(accounts.TextHash(message), key.PrivateKey)
 		if err != nil {
 			utils.Fatalf("Failed to sign message: %v", err)
 		}
@@ -88,7 +89,7 @@ type outputVerify struct {
 	RecoveredPublicKey string
 }
 
-var commandVerifyMessage = cli.Command{
+var commandVerifyMessage = &cli.Command{
 	Name:      "verifymessage",
 	Usage:     "verify the signature of a signed message",
 	ArgsUsage: "<address> <signature> <message>",
@@ -113,7 +114,7 @@ It is possible to refer to a file containing the message.`,
 			utils.Fatalf("Signature encoding is not hexadecimal: %v", err)
 		}
 
-		recoveredPubkey, err := crypto.SigToPub(signHash(message), signature)
+		recoveredPubkey, err := crypto.SigToPub(accounts.TextHash(message), signature)
 		if err != nil || recoveredPubkey == nil {
 			utils.Fatalf("Signature verification failed: %v", err)
 		}
@@ -142,18 +143,18 @@ It is possible to refer to a file containing the message.`,
 }
 
 func getMessage(ctx *cli.Context, msgarg int) []byte {
-	if file := ctx.String("msgfile"); file != "" {
-		if len(ctx.Args()) > msgarg {
+	if file := ctx.String(msgfileFlag.Name); file != "" {
+		if ctx.NArg() > msgarg {
 			utils.Fatalf("Can't use --msgfile and message argument at the same time.")
 		}
-		msg, err := ioutil.ReadFile(file)
+		msg, err := os.ReadFile(file)
 		if err != nil {
 			utils.Fatalf("Can't read message file: %v", err)
 		}
 		return msg
-	} else if len(ctx.Args()) == msgarg+1 {
+	} else if ctx.NArg() == msgarg+1 {
 		return []byte(ctx.Args().Get(msgarg))
 	}
-	utils.Fatalf("Invalid number of arguments: want %d, got %d", msgarg+1, len(ctx.Args()))
+	utils.Fatalf("Invalid number of arguments: want %d, got %d", msgarg+1, ctx.NArg())
 	return nil
 }

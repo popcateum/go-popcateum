@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package discover
 
@@ -35,16 +35,24 @@ type UDPConn interface {
 	LocalAddr() net.Addr
 }
 
+type V5Config struct {
+	ProtocolID *[6]byte
+}
+
 // Config holds settings for the discovery listener.
 type Config struct {
 	// These settings are required and configure the UDP listener:
 	PrivateKey *ecdsa.PrivateKey
 
 	// These settings are optional:
-	NetRestrict  *netutil.Netlist   // network whitelist
-	Bootnodes    []*enode.Node      // list of bootstrap nodes
-	Unhandled    chan<- ReadPacket  // unhandled packets are sent on this channel
-	Log          log.Logger         // if set, log messages go here
+	NetRestrict *netutil.Netlist  // list of allowed IP networks
+	Bootnodes   []*enode.Node     // list of bootstrap nodes
+	Unhandled   chan<- ReadPacket // unhandled packets are sent on this channel
+	Log         log.Logger        // if set, log messages go here
+
+	// V5ProtocolID configures the discv5 protocol identifier.
+	V5ProtocolID *[6]byte
+
 	ValidSchemes enr.IdentityScheme // allowed identity schemes
 	Clock        mclock.Clock
 }

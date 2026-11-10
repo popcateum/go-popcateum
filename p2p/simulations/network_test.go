@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package simulations
 
@@ -36,7 +36,6 @@ import (
 // Tests that a created snapshot with a minimal service only contains the expected connections
 // and that a network when loaded with this snapshot only contains those same connections
 func TestSnapshot(t *testing.T) {
-
 	// PART I
 	// create snapshot from ring network
 
@@ -204,7 +203,6 @@ OuterTwo:
 			t.Fatal(ctx.Err())
 		case ev := <-evC:
 			if ev.Type == EventTypeConn && !ev.Control {
-
 				// fail on any disconnect
 				if !ev.Conn.Up {
 					t.Fatalf("unexpected disconnect: %v -> %v", ev.Conn.One, ev.Conn.Other)
@@ -448,7 +446,7 @@ func TestGetNodeIDs(t *testing.T) {
 	numNodes := 5
 	nodes, err := createTestNodes(numNodes, network)
 	if err != nil {
-		t.Fatalf("Could not creat test nodes %v", err)
+		t.Fatalf("Could not create test nodes %v", err)
 	}
 
 	gotNodeIDs := network.GetNodeIDs()
@@ -497,7 +495,7 @@ func TestGetNodes(t *testing.T) {
 	numNodes := 5
 	nodes, err := createTestNodes(numNodes, network)
 	if err != nil {
-		t.Fatalf("Could not creat test nodes %v", err)
+		t.Fatalf("Could not create test nodes %v", err)
 	}
 
 	gotNodes := network.GetNodes()
@@ -693,7 +691,6 @@ func BenchmarkMinimalService(b *testing.B) {
 }
 
 func benchmarkMinimalServiceTmp(b *testing.B) {
-
 	// stop timer to discard setup time pollution
 	args := strings.Split(b.Name(), "/")
 	nodeCount, err := strconv.ParseInt(args[2], 10, 16)

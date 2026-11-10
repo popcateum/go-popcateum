@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -31,37 +30,39 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/p2p/enr"
 	"github.com/popcateum/go-popcateum/rlp"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
-var enrdumpCommand = cli.Command{
+var fileFlag = &cli.StringFlag{Name: "file"}
+
+var enrdumpCommand = &cli.Command{
 	Name:   "enrdump",
 	Usage:  "Pretty-prints node records",
 	Action: enrdump,
 	Flags: []cli.Flag{
-		cli.StringFlag{Name: "file"},
+		fileFlag,
 	},
 }
 
 func enrdump(ctx *cli.Context) error {
 	var source string
-	if file := ctx.String("file"); file != "" {
+	if file := ctx.String(fileFlag.Name); file != "" {
 		if ctx.NArg() != 0 {
 			return fmt.Errorf("can't dump record from command-line argument in -file mode")
 		}
 		var b []byte
 		var err error
 		if file == "-" {
-			b, err = ioutil.ReadAll(os.Stdin)
+			b, err = io.ReadAll(os.Stdin)
 		} else {
-			b, err = ioutil.ReadFile(file)
+			b, err = os.ReadFile(file)
 		}
 		if err != nil {
 			return err
 		}
 		source = string(b)
 	} else if ctx.NArg() == 1 {
-		source = ctx.Args()[0]
+		source = ctx.Args().First()
 	} else {
 		return fmt.Errorf("need record as argument")
 	}

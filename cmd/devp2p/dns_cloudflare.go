@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -24,16 +24,16 @@ import (
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/p2p/dnsdisc"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
 var (
-	cloudflareTokenFlag = cli.StringFlag{
-		Name:   "token",
-		Usage:  "CloudFlare API token",
-		EnvVar: "CLOUDFLARE_API_TOKEN",
+	cloudflareTokenFlag = &cli.StringFlag{
+		Name:    "token",
+		Usage:   "CloudFlare API token",
+		EnvVars: []string{"CLOUDFLARE_API_TOKEN"},
 	}
-	cloudflareZoneIDFlag = cli.StringFlag{
+	cloudflareZoneIDFlag = &cli.StringFlag{
 		Name:  "zoneid",
 		Usage: "CloudFlare Zone ID (optional)",
 	}
@@ -126,40 +126,51 @@ func (c *cloudflareClient) uploadRecords(name string, records map[string]string)
 	}
 
 	// Iterate over the new records and inject anything missing.
+	log.Info("Updating DNS entries")
+	created := 0
+	updated := 0
+	skipped := 0
 	for path, val := range records {
 		old, exists := existing[path]
 		if !exists {
 			// Entry is unknown, push a new one to Cloudflare.
-			log.Info(fmt.Sprintf("Creating %s = %q", path, val))
+			log.Debug(fmt.Sprintf("Creating %s = %q", path, val))
+			created++
 			ttl := rootTTL
 			if path != name {
-				ttl = treeNodeTTL // Max TTL permitted by Cloudflare
+				ttl = treeNodeTTLCloudflare // Max TTL permitted by Cloudflare
 			}
 			record := cloudflare.DNSRecord{Type: "TXT", Name: path, Content: val, TTL: ttl}
 			_, err = c.CreateDNSRecord(context.Background(), c.zoneID, record)
 		} else if old.Content != val {
 			// Entry already exists, only change its content.
 			log.Info(fmt.Sprintf("Updating %s from %q to %q", path, old.Content, val))
+			updated++
 			old.Content = val
 			err = c.UpdateDNSRecord(context.Background(), c.zoneID, old.ID, old)
 		} else {
+			skipped++
 			log.Debug(fmt.Sprintf("Skipping %s = %q", path, val))
 		}
 		if err != nil {
 			return fmt.Errorf("failed to publish %s: %v", path, err)
 		}
 	}
-
+	log.Info("Updated DNS entries", "new", created, "updated", updated, "untouched", skipped)
 	// Iterate over the old records and delete anything stale.
+	deleted := 0
+	log.Info("Deleting stale DNS entries")
 	for path, entry := range existing {
 		if _, ok := records[path]; ok {
 			continue
 		}
 		// Stale entry, nuke it.
-		log.Info(fmt.Sprintf("Deleting %s = %q", path, entry.Content))
+		log.Debug(fmt.Sprintf("Deleting %s = %q", path, entry.Content))
+		deleted++
 		if err := c.DeleteDNSRecord(context.Background(), c.zoneID, entry.ID); err != nil {
 			return fmt.Errorf("failed to delete %s: %v", path, err)
 		}
 	}
+	log.Info("Deleted stale DNS entries", "count", deleted)
 	return nil
 }

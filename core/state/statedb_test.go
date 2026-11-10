@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package state
 
@@ -55,7 +55,7 @@ func TestUpdateLeaks(t *testing.T) {
 	}
 
 	root := state.IntermediateRoot(false)
-	if err := state.Database().TrieDB().Commit(root, false, nil); err != nil {
+	if err := state.Database().TrieDB().Commit(root, false); err != nil {
 		t.Errorf("can not commit trie %v to persistent database", root.Hex())
 	}
 
@@ -106,7 +106,7 @@ func TestIntermediateLeaks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to commit transition state: %v", err)
 	}
-	if err = transState.Database().TrieDB().Commit(transRoot, false, nil); err != nil {
+	if err = transState.Database().TrieDB().Commit(transRoot, false); err != nil {
 		t.Errorf("can not commit trie %v to persistent database", transRoot.Hex())
 	}
 
@@ -114,7 +114,7 @@ func TestIntermediateLeaks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to commit final state: %v", err)
 	}
-	if err = finalState.Database().TrieDB().Commit(finalRoot, false, nil); err != nil {
+	if err = finalState.Database().TrieDB().Commit(finalRoot, false); err != nil {
 		t.Errorf("can not commit trie %v to persistent database", finalRoot.Hex())
 	}
 
@@ -126,7 +126,7 @@ func TestIntermediateLeaks(t *testing.T) {
 			t.Errorf("entry missing from the transition database: %x -> %x", key, fvalue)
 		}
 		if !bytes.Equal(fvalue, tvalue) {
-			t.Errorf("the value associate key %x is mismatch,: %x in transition database ,%x in final database", key, tvalue, fvalue)
+			t.Errorf("value mismatch at key %x: %x in transition database, %x in final database", key, tvalue, fvalue)
 		}
 	}
 	it.Release()
@@ -139,7 +139,7 @@ func TestIntermediateLeaks(t *testing.T) {
 			t.Errorf("extra entry in the transition database: %x -> %x", key, it.Value())
 		}
 		if !bytes.Equal(fvalue, tvalue) {
-			t.Errorf("the value associate key %x is mismatch,: %x in transition database ,%x in final database", key, tvalue, fvalue)
+			t.Errorf("value mismatch at key %x: %x in transition database, %x in final database", key, tvalue, fvalue)
 		}
 	}
 }
@@ -342,6 +342,16 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 			},
 			args: make([]int64, 1),
 		},
+		{
+			name: "SetTransientState",
+			fn: func(a testAction, s *StateDB) {
+				var key, val common.Hash
+				binary.BigEndian.PutUint16(key[:], uint16(a.args[0]))
+				binary.BigEndian.PutUint16(val[:], uint16(a.args[1]))
+				s.SetTransientState(addr, key, val)
+			},
+			args: make([]int64, 2),
+		},
 	}
 	action := actions[r.Intn(len(actions))]
 	var nameargs []string
@@ -463,9 +473,9 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		return fmt.Errorf("got GetRefund() == %d, want GetRefund() == %d",
 			state.GetRefund(), checkstate.GetRefund())
 	}
-	if !reflect.DeepEqual(state.GetLogs(common.Hash{}), checkstate.GetLogs(common.Hash{})) {
+	if !reflect.DeepEqual(state.GetLogs(common.Hash{}, 0, common.Hash{}), checkstate.GetLogs(common.Hash{}, 0, common.Hash{})) {
 		return fmt.Errorf("got GetLogs(common.Hash{}) == %v, want GetLogs(common.Hash{}) == %v",
-			state.GetLogs(common.Hash{}), checkstate.GetLogs(common.Hash{}))
+			state.GetLogs(common.Hash{}, 0, common.Hash{}), checkstate.GetLogs(common.Hash{}, 0, common.Hash{}))
 	}
 	return nil
 }
@@ -699,7 +709,6 @@ func TestDeleteCreateRevert(t *testing.T) {
 // the Commit operation fails with an error
 // If we are missing trie nodes, we should not continue writing to the trie
 func TestMissingTrieNodes(t *testing.T) {
-
 	// Create an initial state with a few accounts
 	memDb := rawdb.NewMemoryDatabase()
 	db := NewDatabase(memDb)
@@ -772,7 +781,7 @@ func TestStateDBAccessList(t *testing.T) {
 				t.Fatalf("expected %x to be in access list", address)
 			}
 		}
-		// Check that only the expected addresses are present in the acesslist
+		// Check that only the expected addresses are present in the access list
 		for address := range state.accessList.addresses {
 			if _, exist := addressMap[address]; !exist {
 				t.Fatalf("extra address %x in access list", address)
@@ -913,5 +922,79 @@ func TestStateDBAccessList(t *testing.T) {
 	}
 	if got, exp := len(state.accessList.slots), 1; got != exp {
 		t.Fatalf("expected empty, got %d", got)
+	}
+}
+
+// Tests that account and storage tries are flushed in the correct order and that
+// no data loss occurs.
+func TestFlushOrderDataLoss(t *testing.T) {
+	// Create a state trie with many accounts and slots
+	var (
+		memdb    = rawdb.NewMemoryDatabase()
+		statedb  = NewDatabase(memdb)
+		state, _ = New(common.Hash{}, statedb, nil)
+	)
+	for a := byte(0); a < 10; a++ {
+		state.CreateAccount(common.Address{a})
+		for s := byte(0); s < 10; s++ {
+			state.SetState(common.Address{a}, common.Hash{a, s}, common.Hash{a, s})
+		}
+	}
+	root, err := state.Commit(false)
+	if err != nil {
+		t.Fatalf("failed to commit state trie: %v", err)
+	}
+	statedb.TrieDB().Reference(root, common.Hash{})
+	if err := statedb.TrieDB().Cap(1024); err != nil {
+		t.Fatalf("failed to cap trie dirty cache: %v", err)
+	}
+	if err := statedb.TrieDB().Commit(root, false); err != nil {
+		t.Fatalf("failed to commit state trie: %v", err)
+	}
+	// Reopen the state trie from flushed disk and verify it
+	state, err = New(root, NewDatabase(memdb), nil)
+	if err != nil {
+		t.Fatalf("failed to reopen state trie: %v", err)
+	}
+	for a := byte(0); a < 10; a++ {
+		for s := byte(0); s < 10; s++ {
+			if have := state.GetState(common.Address{a}, common.Hash{a, s}); have != (common.Hash{a, s}) {
+				t.Errorf("account %d: slot %d: state mismatch: have %x, want %x", a, s, have, common.Hash{a, s})
+			}
+		}
+	}
+}
+
+func TestStateDBTransientStorage(t *testing.T) {
+	memDb := rawdb.NewMemoryDatabase()
+	db := NewDatabase(memDb)
+	state, _ := New(common.Hash{}, db, nil)
+
+	key := common.Hash{0x01}
+	value := common.Hash{0x02}
+	addr := common.Address{}
+
+	state.SetTransientState(addr, key, value)
+	if exp, got := 1, state.journal.length(); exp != got {
+		t.Fatalf("journal length mismatch: have %d, want %d", got, exp)
+	}
+	// the retrieved value should equal what was set
+	if got := state.GetTransientState(addr, key); got != value {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, value)
+	}
+
+	// revert the transient state being set and then check that the
+	// value is now the empty hash
+	state.journal.revert(state, 0)
+	if got, exp := state.GetTransientState(addr, key), (common.Hash{}); exp != got {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, exp)
+	}
+
+	// set transient state and then copy the statedb and ensure that
+	// the transient state is copied
+	state.SetTransientState(addr, key, value)
+	cpy := state.Copy()
+	if got := cpy.GetTransientState(addr, key); got != value {
+		t.Fatalf("transient storage mismatch: have %x, want %x", got, value)
 	}
 }

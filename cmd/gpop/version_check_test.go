@@ -1,30 +1,32 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/jedisct1/go-minisign"
 )
 
 func TestVerification(t *testing.T) {
@@ -47,17 +49,17 @@ func TestVerification(t *testing.T) {
 
 func testVerification(t *testing.T, pubkey, sigdir string) {
 	// Data to verify
-	data, err := ioutil.ReadFile("./testdata/vcheck/data.json")
+	data, err := os.ReadFile("./testdata/vcheck/data.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Signatures, with and without comments, both trusted and untrusted
-	files, err := ioutil.ReadDir(sigdir)
+	files, err := os.ReadDir(sigdir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, f := range files {
-		sig, err := ioutil.ReadFile(filepath.Join(sigdir, f.Name()))
+		sig, err := os.ReadFile(filepath.Join(sigdir, f.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,13 +87,13 @@ func versionUint(v string) int {
 
 // TestMatching can be used to check that the regexps are correct
 func TestMatching(t *testing.T) {
-	data, _ := ioutil.ReadFile("./testdata/vcheck/vulnerabilities.json")
+	data, _ := os.ReadFile("./testdata/vcheck/vulnerabilities.json")
 	var vulns []vulnJson
 	if err := json.Unmarshal(data, &vulns); err != nil {
 		t.Fatal(err)
 	}
 	check := func(version string) {
-		vFull := fmt.Sprintf("Gpop/%v-unstable-15339cf1-20201204/linux-amd64/go1.15.4", version)
+		vFull := fmt.Sprintf("Geth/%v-unstable-15339cf1-20201204/linux-amd64/go1.15.4", version)
 		for _, vuln := range vulns {
 			r, err := regexp.Compile(vuln.Check)
 			vulnIntro := versionUint(vuln.Introduced)
@@ -101,7 +103,7 @@ func TestMatching(t *testing.T) {
 				t.Fatal(err)
 			}
 			if vuln.Name == "Denial of service due to Go CVE-2020-28362" {
-				// this one is not tied to gpop-versions
+				// this one is not tied to geth-versions
 				continue
 			}
 			if vulnIntro <= current && vulnFixed > current {
@@ -116,7 +118,6 @@ func TestMatching(t *testing.T) {
 						version, vuln.Introduced, vuln.Fixed, vuln.Name, vulnIntro, current, vulnFixed)
 				}
 			}
-
 		}
 	}
 	for major := 1; major < 2; major++ {
@@ -127,4 +128,40 @@ func TestMatching(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGethPubKeysParseable(t *testing.T) {
+	for _, pubkey := range gethPubKeys {
+		_, err := minisign.NewPublicKey(pubkey)
+		if err != nil {
+			t.Errorf("Should be parseable")
+		}
+	}
+}
+
+func TestKeyID(t *testing.T) {
+	type args struct {
+		id [8]byte
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"@holiman key", args{id: extractKeyId(gethPubKeys[0])}, "FB1D084D39BAEC24"},
+		{"second key", args{id: extractKeyId(gethPubKeys[1])}, "138B1CA303E51687"},
+		{"third key", args{id: extractKeyId(gethPubKeys[2])}, "FD9813B2D2098484"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := keyID(tt.args.id); got != tt.want {
+				t.Errorf("keyID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func extractKeyId(pubkey string) [8]byte {
+	p, _ := minisign.NewPublicKey(pubkey)
+	return p.KeyId
 }

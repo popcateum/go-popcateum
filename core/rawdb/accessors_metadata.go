@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rawdb
 
@@ -81,6 +81,20 @@ func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, cfg *params.Cha
 	}
 }
 
+// ReadGenesisStateSpec retrieves the genesis state specification based on the
+// given genesis (block-)hash.
+func ReadGenesisStateSpec(db ethdb.KeyValueReader, blockhash common.Hash) []byte {
+	data, _ := db.Get(genesisStateSpecKey(blockhash))
+	return data
+}
+
+// WriteGenesisStateSpec writes the genesis state specification into the disk.
+func WriteGenesisStateSpec(db ethdb.KeyValueWriter, blockhash common.Hash, data []byte) {
+	if err := db.Put(genesisStateSpecKey(blockhash), data); err != nil {
+		log.Crit("Failed to store genesis state", "err", err)
+	}
+}
+
 // crashList is a list of unclean-shutdown-markers, for rlp-encoding to the
 // database
 type crashList struct {
@@ -136,5 +150,40 @@ func PopUncleanShutdownMarker(db ethdb.KeyValueStore) {
 	data, _ := rlp.EncodeToBytes(uncleanShutdowns)
 	if err := db.Put(uncleanShutdownKey, data); err != nil {
 		log.Warn("Failed to clear unclean-shutdown marker", "err", err)
+	}
+}
+
+// UpdateUncleanShutdownMarker updates the last marker's timestamp to now.
+func UpdateUncleanShutdownMarker(db ethdb.KeyValueStore) {
+	var uncleanShutdowns crashList
+	// Read old data
+	if data, err := db.Get(uncleanShutdownKey); err != nil {
+		log.Warn("Error reading unclean shutdown markers", "error", err)
+	} else if err := rlp.DecodeBytes(data, &uncleanShutdowns); err != nil {
+		log.Warn("Error decoding unclean shutdown markers", "error", err)
+	}
+	// This shouldn't happen because we push a marker on Backend instantiation
+	count := len(uncleanShutdowns.Recent)
+	if count == 0 {
+		log.Warn("No unclean shutdown marker to update")
+		return
+	}
+	uncleanShutdowns.Recent[count-1] = uint64(time.Now().Unix())
+	data, _ := rlp.EncodeToBytes(uncleanShutdowns)
+	if err := db.Put(uncleanShutdownKey, data); err != nil {
+		log.Warn("Failed to write unclean-shutdown marker", "err", err)
+	}
+}
+
+// ReadTransitionStatus retrieves the eth2 transition status from the database
+func ReadTransitionStatus(db ethdb.KeyValueReader) []byte {
+	data, _ := db.Get(transitionStatusKey)
+	return data
+}
+
+// WriteTransitionStatus stores the eth2 transition status to the database
+func WriteTransitionStatus(db ethdb.KeyValueWriter, data []byte) {
+	if err := db.Put(transitionStatusKey, data); err != nil {
+		log.Crit("Failed to store the eth2 transition status", "err", err)
 	}
 }

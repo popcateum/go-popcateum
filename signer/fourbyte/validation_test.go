@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package fourbyte
 
@@ -22,21 +22,21 @@ import (
 
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/hexutil"
-	"github.com/popcateum/go-popcateum/signer/core"
+	"github.com/popcateum/go-popcateum/signer/core/apitypes"
 )
 
 func mixAddr(a string) (*common.MixedcaseAddress, error) {
 	return common.NewMixedcaseAddressFromString(a)
 }
 func toHexBig(h string) hexutil.Big {
-	b := big.NewInt(0).SetBytes(common.FromHex(h))
+	b := new(big.Int).SetBytes(common.FromHex(h))
 	return hexutil.Big(*b)
 }
 func toHexUint(h string) hexutil.Uint64 {
-	b := big.NewInt(0).SetBytes(common.FromHex(h))
+	b := new(big.Int).SetBytes(common.FromHex(h))
 	return hexutil.Uint64(b.Uint64())
 }
-func dummyTxArgs(t txtestcase) *core.SendTxArgs {
+func dummyTxArgs(t txtestcase) *apitypes.SendTxArgs {
 	to, _ := mixAddr(t.to)
 	from, _ := mixAddr(t.from)
 	n := toHexUint(t.n)
@@ -53,14 +53,13 @@ func dummyTxArgs(t txtestcase) *core.SendTxArgs {
 	if t.i != "" {
 		a := hexutil.Bytes(common.FromHex(t.i))
 		input = &a
-
 	}
-	return &core.SendTxArgs{
+	return &apitypes.SendTxArgs{
 		From:     *from,
 		To:       to,
 		Value:    value,
 		Nonce:    n,
-		GasPrice: gasPrice,
+		GasPrice: &gasPrice,
 		Gas:      gas,
 		Data:     data,
 		Input:    input,

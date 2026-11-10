@@ -1,18 +1,18 @@
-// Copyright 2021 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package snap
 
@@ -53,7 +53,7 @@ func TestHashRanges(t *testing.T) {
 			head:   common.HexToHash("0x2000000000000000000000000000000000000000000000000000000000000000"),
 			chunks: 2,
 			starts: []common.Hash{
-				common.Hash{},
+				{},
 				common.HexToHash("0x9000000000000000000000000000000000000000000000000000000000000000"),
 			},
 			ends: []common.Hash{
@@ -95,7 +95,7 @@ func TestHashRanges(t *testing.T) {
 		// meaningful space size for manual verification.
 		//   - The head being 0xff...f0, we have 14 hashes left in the space
 		//   - Chunking up 14 into 3 pieces is 4.(6), but we need the ceil of 5 to avoid a micro-last-chunk
-		//   - Since the range is not divisible, the last interval will be shrter, capped at 0xff...f
+		//   - Since the range is not divisible, the last interval will be shorter, capped at 0xff...f
 		//   - The chunk ranges thus needs to be [..0, ..5], [..6, ..b], [..c, ..f]
 		{
 			head:   common.HexToHash("0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0"),

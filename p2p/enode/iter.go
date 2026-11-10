@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package enode
 
@@ -203,27 +203,34 @@ func (m *FairMix) Close() {
 func (m *FairMix) Next() bool {
 	m.cur = nil
 
-	var timeout <-chan time.Time
-	if m.timeout >= 0 {
-		timer := time.NewTimer(m.timeout)
-		timeout = timer.C
-		defer timer.Stop()
-	}
 	for {
 		source := m.pickSource()
 		if source == nil {
 			return m.nextFromAny()
 		}
+
+		var timeout <-chan time.Time
+		if source.timeout >= 0 {
+			timer := time.NewTimer(source.timeout)
+			timeout = timer.C
+			defer timer.Stop()
+		}
+
 		select {
 		case n, ok := <-source.next:
 			if ok {
-				m.cur = n
+				// Here, the timeout is reset to the configured value
+				// because the source delivered a node.
 				source.timeout = m.timeout
+				m.cur = n
 				return true
 			}
 			// This source has ended.
 			m.deleteSource(source)
 		case <-timeout:
+			// The selected source did not deliver a node within the timeout, so the
+			// timeout duration is halved for next time. This is supposed to improve
+			// latency with stuck sources.
 			source.timeout /= 2
 			return m.nextFromAny()
 		}

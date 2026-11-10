@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package node
 
@@ -39,10 +39,11 @@ func StartHTTPEndpoint(endpoint string, timeouts rpc.HTTPTimeouts, handler http.
 	CheckTimeouts(&timeouts)
 	// Bundle and start the HTTP server
 	httpSrv := &http.Server{
-		Handler:      handler,
-		ReadTimeout:  timeouts.ReadTimeout,
-		WriteTimeout: timeouts.WriteTimeout,
-		IdleTimeout:  timeouts.IdleTimeout,
+		Handler:           handler,
+		ReadTimeout:       timeouts.ReadTimeout,
+		ReadHeaderTimeout: timeouts.ReadHeaderTimeout,
+		WriteTimeout:      timeouts.WriteTimeout,
+		IdleTimeout:       timeouts.IdleTimeout,
 	}
 	go httpSrv.Serve(listener)
 	return httpSrv, listener.Addr(), err
@@ -60,8 +61,10 @@ func checkModuleAvailability(modules []string, apis []rpc.API) (bad, available [
 		}
 	}
 	for _, name := range modules {
-		if _, ok := availableSet[name]; !ok && name != rpc.MetadataApi {
-			bad = append(bad, name)
+		if _, ok := availableSet[name]; !ok {
+			if name != rpc.MetadataApi && name != rpc.EngineApi {
+				bad = append(bad, name)
+			}
 		}
 	}
 	return bad, available
@@ -72,6 +75,10 @@ func CheckTimeouts(timeouts *rpc.HTTPTimeouts) {
 	if timeouts.ReadTimeout < time.Second {
 		log.Warn("Sanitizing invalid HTTP read timeout", "provided", timeouts.ReadTimeout, "updated", rpc.DefaultHTTPTimeouts.ReadTimeout)
 		timeouts.ReadTimeout = rpc.DefaultHTTPTimeouts.ReadTimeout
+	}
+	if timeouts.ReadHeaderTimeout < time.Second {
+		log.Warn("Sanitizing invalid HTTP read header timeout", "provided", timeouts.ReadHeaderTimeout, "updated", rpc.DefaultHTTPTimeouts.ReadHeaderTimeout)
+		timeouts.ReadHeaderTimeout = rpc.DefaultHTTPTimeouts.ReadHeaderTimeout
 	}
 	if timeouts.WriteTimeout < time.Second {
 		log.Warn("Sanitizing invalid HTTP write timeout", "provided", timeouts.WriteTimeout, "updated", rpc.DefaultHTTPTimeouts.WriteTimeout)

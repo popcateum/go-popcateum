@@ -1,24 +1,24 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package ethash
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +37,7 @@ func TestRemoteNotify(t *testing.T) {
 	// Start a simple web server to capture notifications.
 	sink := make(chan [3]string)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		blob, err := ioutil.ReadAll(req.Body)
+		blob, err := io.ReadAll(req.Body)
 		if err != nil {
 			t.Errorf("failed to read miner notification: %v", err)
 		}
@@ -80,7 +80,7 @@ func TestRemoteNotifyFull(t *testing.T) {
 	// Start a simple web server to capture notifications.
 	sink := make(chan map[string]interface{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		blob, err := ioutil.ReadAll(req.Body)
+		blob, err := io.ReadAll(req.Body)
 		if err != nil {
 			t.Errorf("failed to read miner notification: %v", err)
 		}
@@ -125,7 +125,7 @@ func TestRemoteMultiNotify(t *testing.T) {
 	// Start a simple web server to capture notifications.
 	sink := make(chan [3]string, 64)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		blob, err := ioutil.ReadAll(req.Body)
+		blob, err := io.ReadAll(req.Body)
 		if err != nil {
 			t.Errorf("failed to read miner notification: %v", err)
 		}
@@ -170,7 +170,7 @@ func TestRemoteMultiNotifyFull(t *testing.T) {
 	// Start a simple web server to capture notifications.
 	sink := make(chan map[string]interface{}, 64)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		blob, err := ioutil.ReadAll(req.Body)
+		blob, err := io.ReadAll(req.Body)
 		if err != nil {
 			t.Errorf("failed to read miner notification: %v", err)
 		}

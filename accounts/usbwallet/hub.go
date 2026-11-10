@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package usbwallet
 
@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/karalabe/usb"
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/log"
-	"github.com/karalabe/usb"
 )
 
 // LedgerScheme is the protocol scheme prefixing account and wallet URLs.
@@ -71,18 +71,28 @@ type Hub struct {
 // NewLedgerHub creates a new hardware wallet manager for Ledger devices.
 func NewLedgerHub() (*Hub, error) {
 	return newHub(LedgerScheme, 0x2c97, []uint16{
+
+		// Device definitions taken from
+		// https://github.com/LedgerHQ/ledger-live/blob/38012bc8899e0f07149ea9cfe7e64b2c146bc92b/libs/ledgerjs/packages/devices/src/index.ts
+
 		// Original product IDs
 		0x0000, /* Ledger Blue */
 		0x0001, /* Ledger Nano S */
 		0x0004, /* Ledger Nano X */
+		0x0005, /* Ledger Nano S Plus */
+		0x0006, /* Ledger Nano FTS */
 
-		// Upcoming product IDs: https://www.ledger.com/2019/05/17/windows-10-update-sunsetting-u2f-tunnel-transport-for-ledger-devices/
 		0x0015, /* HID + U2F + WebUSB Ledger Blue */
 		0x1015, /* HID + U2F + WebUSB Ledger Nano S */
 		0x4015, /* HID + U2F + WebUSB Ledger Nano X */
+		0x5015, /* HID + U2F + WebUSB Ledger Nano S Plus */
+		0x6015, /* HID + U2F + WebUSB Ledger Nano FTS */
+
 		0x0011, /* HID + WebUSB Ledger Blue */
 		0x1011, /* HID + WebUSB Ledger Nano S */
 		0x4011, /* HID + WebUSB Ledger Nano X */
+		0x5011, /* HID + WebUSB Ledger Nano S Plus */
+		0x6011, /* HID + WebUSB Ledger Nano FTS */
 	}, 0xffa0, 0, newLedgerDriver)
 }
 

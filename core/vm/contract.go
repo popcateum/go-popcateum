@@ -1,26 +1,26 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
 
 import (
 	"math/big"
 
-	"github.com/popcateum/go-popcateum/common"
 	"github.com/holiman/uint256"
+	"github.com/popcateum/go-popcateum/common"
 )
 
 // ContractRef is a reference to the contract's backing object
@@ -40,7 +40,7 @@ type AccountRef common.Address
 // Address casts AccountRef to a Address
 func (ar AccountRef) Address() common.Address { return (common.Address)(ar) }
 
-// Contract represents an popcateum contract in the state database. It contains
+// Contract represents an ethereum contract in the state database. It contains
 // the contract code, calling arguments. Contract implements ContractRef
 type Contract struct {
 	// CallerAddress is the result of the caller which initialised this
@@ -143,16 +143,11 @@ func (c *Contract) AsDelegate() *Contract {
 
 // GetOp returns the n'th element in the contract's byte array
 func (c *Contract) GetOp(n uint64) OpCode {
-	return OpCode(c.GetByte(n))
-}
-
-// GetByte returns the n'th byte in the contract's byte array
-func (c *Contract) GetByte(n uint64) byte {
 	if n < uint64(len(c.Code)) {
-		return c.Code[n]
+		return OpCode(c.Code[n])
 	}
 
-	return 0
+	return STOP
 }
 
 // Caller returns the caller of the contract.

@@ -1,3 +1,19 @@
+// Copyright 2020 The go-ethereum Authors
+// This file is part of go-ethereum.
+//
+// go-ethereum is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// go-ethereum is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+
 package main
 
 import (
@@ -15,31 +31,31 @@ import (
 	"github.com/popcateum/go-popcateum/rpc"
 )
 
-type gpoprpc struct {
+type gethrpc struct {
 	name     string
 	rpc      *rpc.Client
-	gpop     *testgpop
+	geth     *testgeth
 	nodeInfo *p2p.NodeInfo
 }
 
-func (g *gpoprpc) killAndWait() {
-	g.gpop.Kill()
-	g.gpop.WaitExit()
+func (g *gethrpc) killAndWait() {
+	g.geth.Kill()
+	g.geth.WaitExit()
 }
 
-func (g *gpoprpc) callRPC(result interface{}, method string, args ...interface{}) {
+func (g *gethrpc) callRPC(result interface{}, method string, args ...interface{}) {
 	if err := g.rpc.Call(&result, method, args...); err != nil {
-		g.gpop.Fatalf("callRPC %v: %v", method, err)
+		g.geth.Fatalf("callRPC %v: %v", method, err)
 	}
 }
 
-func (g *gpoprpc) addPeer(peer *gpoprpc) {
-	g.gpop.Logf("%v.addPeer(%v)", g.name, peer.name)
+func (g *gethrpc) addPeer(peer *gethrpc) {
+	g.geth.Logf("%v.addPeer(%v)", g.name, peer.name)
 	enode := peer.getNodeInfo().Enode
 	peerCh := make(chan *p2p.PeerEvent)
 	sub, err := g.rpc.Subscribe(context.Background(), "admin", peerCh, "peerEvents")
 	if err != nil {
-		g.gpop.Fatalf("subscribe %v: %v", g.name, err)
+		g.geth.Fatalf("subscribe %v: %v", g.name, err)
 	}
 	defer sub.Unsubscribe()
 	g.callRPC(nil, "admin_addPeer", enode)
@@ -47,57 +63,22 @@ func (g *gpoprpc) addPeer(peer *gpoprpc) {
 	timeout := time.After(dur)
 	select {
 	case ev := <-peerCh:
-		g.gpop.Logf("%v received event: type=%v, peer=%v", g.name, ev.Type, ev.Peer)
+		g.geth.Logf("%v received event: type=%v, peer=%v", g.name, ev.Type, ev.Peer)
 	case err := <-sub.Err():
-		g.gpop.Fatalf("%v sub error: %v", g.name, err)
+		g.geth.Fatalf("%v sub error: %v", g.name, err)
 	case <-timeout:
-		g.gpop.Error("timeout adding peer after", dur)
+		g.geth.Error("timeout adding peer after", dur)
 	}
 }
 
 // Use this function instead of `g.nodeInfo` directly
-func (g *gpoprpc) getNodeInfo() *p2p.NodeInfo {
+func (g *gethrpc) getNodeInfo() *p2p.NodeInfo {
 	if g.nodeInfo != nil {
 		return g.nodeInfo
 	}
 	g.nodeInfo = &p2p.NodeInfo{}
 	g.callRPC(&g.nodeInfo, "admin_nodeInfo")
 	return g.nodeInfo
-}
-
-func (g *gpoprpc) waitSynced() {
-	// Check if it's synced now
-	var result interface{}
-	g.callRPC(&result, "eth_syncing")
-	syncing, ok := result.(bool)
-	if ok && !syncing {
-		g.gpop.Logf("%v already synced", g.name)
-		return
-	}
-
-	// Actually wait, subscribe to the event
-	ch := make(chan interface{})
-	sub, err := g.rpc.Subscribe(context.Background(), "eth", ch, "syncing")
-	if err != nil {
-		g.gpop.Fatalf("%v syncing: %v", g.name, err)
-	}
-	defer sub.Unsubscribe()
-	timeout := time.After(4 * time.Second)
-	select {
-	case ev := <-ch:
-		g.gpop.Log("'syncing' event", ev)
-		syncing, ok := ev.(bool)
-		if ok && !syncing {
-			break
-		}
-		g.gpop.Log("Other 'syncing' event", ev)
-	case err := <-sub.Err():
-		g.gpop.Fatalf("%v notification: %v", g.name, err)
-		break
-	case <-timeout:
-		g.gpop.Fatalf("%v timeout syncing", g.name)
-		break
-	}
 }
 
 // ipcEndpoint resolves an IPC endpoint based on a configured value, taking into
@@ -128,46 +109,50 @@ func ipcEndpoint(ipcPath, datadir string) string {
 // the pipe filename instead of folder.
 var nextIPC = uint32(0)
 
-func startGpopWithIpc(t *testing.T, name string, args ...string) *gpoprpc {
-	ipcName := fmt.Sprintf("gpop-%d.ipc", atomic.AddUint32(&nextIPC, 1))
-	args = append([]string{"--networkid=42", "--port=0", "--ipcpath", ipcName}, args...)
+func startGethWithIpc(t *testing.T, name string, args ...string) *gethrpc {
+	ipcName := fmt.Sprintf("geth-%d.ipc", atomic.AddUint32(&nextIPC, 1))
+	args = append([]string{"--networkid=42", "--port=0", "--authrpc.port", "0", "--ipcpath", ipcName}, args...)
 	t.Logf("Starting %v with rpc: %v", name, args)
 
-	g := &gpoprpc{
+	g := &gethrpc{
 		name: name,
-		gpop: runGpop(t, args...),
+		geth: runGeth(t, args...),
 	}
-	// wait before we can attach to it. TODO: probe for it properly
-	time.Sleep(1 * time.Second)
+	ipcpath := ipcEndpoint(ipcName, g.geth.Datadir)
+	// We can't know exactly how long geth will take to start, so we try 10
+	// times over a 5 second period.
 	var err error
-	ipcpath := ipcEndpoint(ipcName, g.gpop.Datadir)
-	if g.rpc, err = rpc.Dial(ipcpath); err != nil {
-		t.Fatalf("%v rpc connect to %v: %v", name, ipcpath, err)
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if g.rpc, err = rpc.Dial(ipcpath); err == nil {
+			return g
+		}
 	}
-	return g
+	t.Fatalf("%v rpc connect to %v: %v", name, ipcpath, err)
+	return nil
 }
 
-func initGpop(t *testing.T) string {
+func initGeth(t *testing.T) string {
 	args := []string{"--networkid=42", "init", "./testdata/clique.json"}
-	t.Logf("Initializing gpop: %v ", args)
-	g := runGpop(t, args...)
+	t.Logf("Initializing geth: %v ", args)
+	g := runGeth(t, args...)
 	datadir := g.Datadir
 	g.WaitExit()
 	return datadir
 }
 
-func startLightServer(t *testing.T) *gpoprpc {
-	datadir := initGpop(t)
-	t.Logf("Importing keys to gpop")
-	runGpop(t, "--datadir", datadir, "--password", "./testdata/password.txt", "account", "import", "./testdata/key.prv", "--lightkdf").WaitExit()
+func startLightServer(t *testing.T) *gethrpc {
+	datadir := initGeth(t)
+	t.Logf("Importing keys to geth")
+	runGeth(t, "account", "import", "--datadir", datadir, "--password", "./testdata/password.txt", "--lightkdf", "./testdata/key.prv").WaitExit()
 	account := "0x02f0d131f1f97aef08aec6e3291b957d9efe7105"
-	server := startGpopWithIpc(t, "lightserver", "--allow-insecure-unlock", "--datadir", datadir, "--password", "./testdata/password.txt", "--unlock", account, "--mine", "--light.serve=100", "--light.maxpeers=1", "--nodiscover", "--nat=extip:127.0.0.1", "--verbosity=4")
+	server := startGethWithIpc(t, "lightserver", "--allow-insecure-unlock", "--datadir", datadir, "--password", "./testdata/password.txt", "--unlock", account, "--miner.etherbase=0x02f0d131f1f97aef08aec6e3291b957d9efe7105", "--mine", "--light.serve=100", "--light.maxpeers=1", "--nodiscover", "--nat=extip:127.0.0.1", "--verbosity=4")
 	return server
 }
 
-func startClient(t *testing.T, name string) *gpoprpc {
-	datadir := initGpop(t)
-	return startGpopWithIpc(t, name, "--datadir", datadir, "--nodiscover", "--syncmode=light", "--nat=extip:127.0.0.1", "--verbosity=4")
+func startClient(t *testing.T, name string) *gethrpc {
+	datadir := initGeth(t)
+	return startGethWithIpc(t, name, "--datadir", datadir, "--nodiscover", "--syncmode=light", "--nat=extip:127.0.0.1", "--verbosity=4")
 }
 
 func TestPriorityClient(t *testing.T) {
@@ -200,7 +185,7 @@ func TestPriorityClient(t *testing.T) {
 		t.Errorf("Expected: # of prio peers == 1, actual: %v", len(peers))
 	}
 
-	nodes := map[string]*gpoprpc{
+	nodes := map[string]*gethrpc{
 		lightServer.getNodeInfo().ID: lightServer,
 		freeCli.getNodeInfo().ID:     freeCli,
 		prioCli.getNodeInfo().ID:     prioCli,

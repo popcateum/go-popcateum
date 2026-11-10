@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package nat provides access to common network port mapping protocols.
 package nat
@@ -25,11 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/popcateum/go-popcateum/log"
 	natpmp "github.com/jackpal/go-nat-pmp"
+	"github.com/popcateum/go-popcateum/log"
 )
 
-// An implementation of nat.Interface can map local ports to ports
+// Interface An implementation of nat.Interface can map local ports to ports
 // accessible from the Internet.
 type Interface interface {
 	// These methods manage a mapping between a port on the local
@@ -41,11 +41,11 @@ type Interface interface {
 	AddMapping(protocol string, extport, intport int, name string, lifetime time.Duration) error
 	DeleteMapping(protocol string, extport, intport int) error
 
-	// This method should return the external (Internet-facing)
+	// ExternalIP should return the external (Internet-facing)
 	// address of the gateway device.
 	ExternalIP() (net.IP, error)
 
-	// Should return name of the method. This is used for logging.
+	// String should return name of the method. This is used for logging.
 	String() string
 }
 
@@ -53,12 +53,12 @@ type Interface interface {
 // The following formats are currently accepted.
 // Note that mechanism names are not case-sensitive.
 //
-//     "" or "none"         return nil
-//     "extip:77.12.33.4"   will assume the local machine is reachable on the given IP
-//     "any"                uses the first auto-detected mechanism
-//     "upnp"               uses the Universal Plug and Play protocol
-//     "pmp"                uses NAT-PMP with an auto-detected gateway address
-//     "pmp:192.168.0.1"    uses NAT-PMP with the given gateway address
+//	"" or "none"         return nil
+//	"extip:77.12.33.4"   will assume the local machine is reachable on the given IP
+//	"any"                uses the first auto-detected mechanism
+//	"upnp"               uses the Universal Plug and Play protocol
+//	"pmp"                uses NAT-PMP with an auto-detected gateway address
+//	"pmp:192.168.0.1"    uses NAT-PMP with the given gateway address
 func Parse(spec string) (Interface, error) {
 	var (
 		parts = strings.SplitN(spec, ":", 2)

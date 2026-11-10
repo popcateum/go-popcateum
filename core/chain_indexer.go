@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
@@ -75,7 +75,7 @@ type ChainIndexer struct {
 	backend  ChainIndexerBackend // Background processor generating the index data content
 	children []*ChainIndexer     // Child indexers to cascade chain updates to
 
-	active    uint32          // Flag whether the event loop was started
+	active    atomic.Bool     // Flag whether the event loop was started
 	update    chan struct{}   // Notification channel that headers should be processed
 	quit      chan chan error // Quit channel to tear down running goroutines
 	ctx       context.Context
@@ -166,7 +166,7 @@ func (c *ChainIndexer) Close() error {
 		errs = append(errs, err)
 	}
 	// If needed, tear down the secondary event loop
-	if atomic.LoadUint32(&c.active) != 0 {
+	if c.active.Load() {
 		c.quit <- errc
 		if err := <-errc; err != nil {
 			errs = append(errs, err)
@@ -196,7 +196,7 @@ func (c *ChainIndexer) Close() error {
 // queue.
 func (c *ChainIndexer) eventLoop(currentHeader *types.Header, events chan ChainHeadEvent, sub event.Subscription) {
 	// Mark the chain indexer as active, requiring an additional teardown
-	atomic.StoreUint32(&c.active, 1)
+	c.active.Store(true)
 
 	defer sub.Unsubscribe()
 

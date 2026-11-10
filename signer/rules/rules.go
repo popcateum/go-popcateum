@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rules
 
@@ -24,14 +24,10 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/popcateum/go-popcateum/internal/ethapi"
+	"github.com/popcateum/go-popcateum/internal/jsre/deps"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/signer/core"
-	"github.com/popcateum/go-popcateum/signer/rules/deps"
 	"github.com/popcateum/go-popcateum/signer/storage"
-)
-
-var (
-	BigNumber_JS = deps.MustAsset("bignumber.js")
 )
 
 // consoleOutput is an override for the console.log and console.error methods to
@@ -63,6 +59,7 @@ func NewRuleEvaluator(next core.UIClientAPI, jsbackend storage.Storage) (*rulese
 	return c, nil
 }
 func (r *rulesetUI) RegisterUIServer(api *core.UIServerAPI) {
+	r.next.RegisterUIServer(api)
 	// TODO, make it possible to query from js
 }
 
@@ -71,7 +68,6 @@ func (r *rulesetUI) Init(javascriptRules string) error {
 	return nil
 }
 func (r *rulesetUI) execute(jsfunc string, jsarg interface{}) (goja.Value, error) {
-
 	// Instantiate a fresh vm engine every time
 	vm := goja.New()
 
@@ -99,7 +95,7 @@ func (r *rulesetUI) execute(jsfunc string, jsarg interface{}) (goja.Value, error
 	vm.Set("storage", storageObj)
 
 	// Load bootstrap libraries
-	script, err := goja.Compile("bignumber.js", string(BigNumber_JS), true)
+	script, err := goja.Compile("bignumber.js", deps.BigNumberJS, true)
 	if err != nil {
 		log.Warn("Failed loading libraries", "err", err)
 		return goja.Undefined(), err

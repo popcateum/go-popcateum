@@ -1,18 +1,18 @@
-// Copyright 2021 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package build
 
@@ -85,7 +85,7 @@ func (g *GoToolchain) goTool(command string, args ...string) *exec.Cmd {
 	if g.Root == "" {
 		g.Root = runtime.GOROOT()
 	}
-	tool := exec.Command(filepath.Join(g.Root, "bin", "go"), command)
+	tool := exec.Command(filepath.Join(g.Root, "bin", "go"), command) // nolint: gosec
 	tool.Args = append(tool.Args, args...)
 	tool.Env = append(tool.Env, "GOROOT="+g.Root)
 
@@ -137,7 +137,7 @@ func DownloadGo(csdb *ChecksumDB, version string) string {
 		log.Fatal(err)
 	}
 
-	godir := filepath.Join(ucache, fmt.Sprintf("gpop-go-%s-%s-%s", version, os, arch))
+	godir := filepath.Join(ucache, fmt.Sprintf("geth-go-%s-%s-%s", version, os, arch))
 	if err := ExtractArchive(dst, godir); err != nil {
 		log.Fatal(err)
 	}

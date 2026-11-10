@@ -1,18 +1,18 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package keystore
 
@@ -20,8 +20,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -32,10 +30,7 @@ import (
 )
 
 func tmpKeyStoreIface(t *testing.T, encrypted bool) (dir string, ks keyStore) {
-	d, err := ioutil.TempDir("", "gpop-keystore-test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	d := t.TempDir()
 	if encrypted {
 		ks = &keyStorePassphrase{d, veryLightScryptN, veryLightScryptP, true}
 	} else {
@@ -45,8 +40,7 @@ func tmpKeyStoreIface(t *testing.T, encrypted bool) (dir string, ks keyStore) {
 }
 
 func TestKeyStorePlain(t *testing.T) {
-	dir, ks := tmpKeyStoreIface(t, false)
-	defer os.RemoveAll(dir)
+	_, ks := tmpKeyStoreIface(t, false)
 
 	pass := "" // not used but required by API
 	k1, account, err := storeNewKey(ks, rand.Reader, pass)
@@ -66,8 +60,7 @@ func TestKeyStorePlain(t *testing.T) {
 }
 
 func TestKeyStorePassphrase(t *testing.T) {
-	dir, ks := tmpKeyStoreIface(t, true)
-	defer os.RemoveAll(dir)
+	_, ks := tmpKeyStoreIface(t, true)
 
 	pass := "foo"
 	k1, account, err := storeNewKey(ks, rand.Reader, pass)
@@ -87,8 +80,7 @@ func TestKeyStorePassphrase(t *testing.T) {
 }
 
 func TestKeyStorePassphraseDecryptionFail(t *testing.T) {
-	dir, ks := tmpKeyStoreIface(t, true)
-	defer os.RemoveAll(dir)
+	_, ks := tmpKeyStoreIface(t, true)
 
 	pass := "foo"
 	k1, account, err := storeNewKey(ks, rand.Reader, pass)
@@ -102,7 +94,6 @@ func TestKeyStorePassphraseDecryptionFail(t *testing.T) {
 
 func TestImportPreSaleKey(t *testing.T) {
 	dir, ks := tmpKeyStoreIface(t, true)
-	defer os.RemoveAll(dir)
 
 	// file content of a presale key file generated with:
 	// python pyethsaletool.py genwallet
@@ -121,7 +112,7 @@ func TestImportPreSaleKey(t *testing.T) {
 	}
 }
 
-// Test and utils for the key store tests in the Popcateum JSON tests;
+// Test and utils for the key store tests in the Ethereum JSON tests;
 // testdataKeyStoreTests/basic_tests.json
 type KeyStoreTestV3 struct {
 	Json     encryptedKeyJSONV3

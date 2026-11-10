@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package external
 
@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/popcateum/go-popcateum"
+	ethereum "github.com/popcateum/go-popcateum"
 	"github.com/popcateum/go-popcateum/accounts"
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/hexutil"
@@ -29,7 +29,7 @@ import (
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/rpc"
-	"github.com/popcateum/go-popcateum/signer/core"
+	"github.com/popcateum/go-popcateum/signer/core/apitypes"
 )
 
 type ExternalBackend struct {
@@ -148,12 +148,8 @@ func (api *ExternalSigner) Derive(path accounts.DerivationPath, pin bool) (accou
 	return accounts.Account{}, fmt.Errorf("operation not supported on external signers")
 }
 
-func (api *ExternalSigner) SelfDerive(bases []accounts.DerivationPath, chain popcateum.ChainStateReader) {
+func (api *ExternalSigner) SelfDerive(bases []accounts.DerivationPath, chain ethereum.ChainStateReader) {
 	log.Error("operation SelfDerive not supported on external signers")
-}
-
-func (api *ExternalSigner) signHash(account accounts.Account, hash []byte) ([]byte, error) {
-	return []byte{}, fmt.Errorf("operation not supported on external signers")
 }
 
 // SignData signs keccak256(data). The mimetype parameter describes the type of data being signed
@@ -184,8 +180,8 @@ func (api *ExternalSigner) SignText(account accounts.Account, text []byte) ([]by
 	}
 	if signature[64] == 27 || signature[64] == 28 {
 		// If clef is used as a backend, it may already have transformed
-		// the signature to popcateum-type signature.
-		signature[64] -= 27 // Transform V from Popcateum-legacy to 0/1
+		// the signature to ethereum-type signature.
+		signature[64] -= 27 // Transform V from Ethereum-legacy to 0/1
 	}
 	return signature, nil
 }
@@ -196,6 +192,10 @@ type signTransactionResult struct {
 	Tx  *types.Transaction `json:"tx"`
 }
 
+// SignTx sends the transaction to the external signer.
+// If chainID is nil, or tx.ChainID is zero, the chain ID will be assigned
+// by the external signer. For non-legacy transactions, the chain ID of the
+// transaction overrides the chainID parameter.
 func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	data := hexutil.Bytes(tx.Data())
 	var to *common.MixedcaseAddress
@@ -203,26 +203,34 @@ func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transactio
 		t := common.NewMixedcaseAddress(*tx.To())
 		to = &t
 	}
-	args := &core.SendTxArgs{
-		Data:     &data,
-		Nonce:    hexutil.Uint64(tx.Nonce()),
-		Value:    hexutil.Big(*tx.Value()),
-		Gas:      hexutil.Uint64(tx.Gas()),
-		GasPrice: hexutil.Big(*tx.GasPrice()),
-		To:       to,
-		From:     common.NewMixedcaseAddress(account.Address),
+	args := &apitypes.SendTxArgs{
+		Data:  &data,
+		Nonce: hexutil.Uint64(tx.Nonce()),
+		Value: hexutil.Big(*tx.Value()),
+		Gas:   hexutil.Uint64(tx.Gas()),
+		To:    to,
+		From:  common.NewMixedcaseAddress(account.Address),
+	}
+	switch tx.Type() {
+	case types.LegacyTxType, types.AccessListTxType:
+		args.GasPrice = (*hexutil.Big)(tx.GasPrice())
+	case types.DynamicFeeTxType:
+		args.MaxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
+		args.MaxPriorityFeePerGas = (*hexutil.Big)(tx.GasTipCap())
+	default:
+		return nil, fmt.Errorf("unsupported tx type %d", tx.Type())
 	}
 	// We should request the default chain id that we're operating with
 	// (the chain we're executing on)
-	if chainID != nil {
+	if chainID != nil && chainID.Sign() != 0 {
 		args.ChainID = (*hexutil.Big)(chainID)
 	}
-	// However, if the user asked for a particular chain id, then we should
-	// use that instead.
-	if tx.Type() != types.LegacyTxType && tx.ChainId() != nil {
-		args.ChainID = (*hexutil.Big)(tx.ChainId())
-	}
-	if tx.Type() == types.AccessListTxType {
+	if tx.Type() != types.LegacyTxType {
+		// However, if the user asked for a particular chain id, then we should
+		// use that instead.
+		if tx.ChainId().Sign() != 0 {
+			args.ChainID = (*hexutil.Big)(tx.ChainId())
+		}
 		accessList := tx.AccessList()
 		args.AccessList = &accessList
 	}

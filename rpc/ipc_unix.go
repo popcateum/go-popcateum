@@ -1,19 +1,20 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+//go:build darwin || dragonfly || freebsd || linux || nacl || netbsd || openbsd || solaris
 // +build darwin dragonfly freebsd linux nacl netbsd openbsd solaris
 
 package rpc
@@ -30,8 +31,9 @@ import (
 
 // ipcListen will create a Unix socket on the given endpoint.
 func ipcListen(endpoint string) (net.Listener, error) {
-	if len(endpoint) > int(max_path_size) {
-		log.Warn(fmt.Sprintf("The ipc endpoint is longer than %d characters. ", max_path_size),
+	// account for null-terminator too
+	if len(endpoint)+1 > int(max_path_size) {
+		log.Warn(fmt.Sprintf("The ipc endpoint is longer than %d characters. ", max_path_size-1),
 			"endpoint", endpoint)
 	}
 

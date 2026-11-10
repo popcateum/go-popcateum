@@ -1,28 +1,30 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
 import (
 	"context"
+	"math/rand"
 	"sort"
 	"time"
 
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/light"
 )
@@ -118,14 +120,14 @@ func (h peerByTxHistory) Less(i, j int) bool {
 func (h peerByTxHistory) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 
 const (
-	maxTxStatusRetry      = 3 // The maximum retrys will be made for tx status request.
+	maxTxStatusRetry      = 3 // The maximum retries will be made for tx status request.
 	maxTxStatusCandidates = 5 // The maximum les servers the tx status requests will be sent to.
 )
 
 // RetrieveTxStatus retrieves the transaction status from the LES network.
 // There is no guarantee in the LES protocol that the mined transaction will
 // be retrieved back for sure because of different reasons(the transaction
-// is unindexed, the malicous server doesn't reply it deliberately, etc).
+// is unindexed, the malicious server doesn't reply it deliberately, etc).
 // Therefore, unretrieved transactions(UNKNOWN) will receive a certain number
 // of retries, thus giving a weak guarantee.
 func (odr *LesOdr) RetrieveTxStatus(ctx context.Context, req *light.TxStatusRequest) error {
@@ -156,7 +158,7 @@ func (odr *LesOdr) RetrieveTxStatus(ctx context.Context, req *light.TxStatusRequ
 		var (
 			// Deep copy the request, so that the partial result won't be mixed.
 			req     = &TxStatusRequest{Hashes: req.Hashes}
-			id      = genReqID()
+			id      = rand.Uint64()
 			distreq = &distReq{
 				getCost: func(dp distPeer) uint64 { return req.GetCost(dp.(*serverPeer)) },
 				canSend: func(dp distPeer) bool { return canSend[dp.(*serverPeer).id] },
@@ -175,10 +177,10 @@ func (odr *LesOdr) RetrieveTxStatus(ctx context.Context, req *light.TxStatusRequ
 		// All the response is not verifiable, so always pick the first
 		// one we get.
 		for index, status := range req.Status {
-			if result[index].Status != core.TxStatusUnknown {
+			if result[index].Status != txpool.TxStatusUnknown {
 				continue
 			}
-			if status.Status == core.TxStatusUnknown {
+			if status.Status == txpool.TxStatusUnknown {
 				continue
 			}
 			result[index], missing = status, missing-1
@@ -200,7 +202,7 @@ func (odr *LesOdr) RetrieveTxStatus(ctx context.Context, req *light.TxStatusRequ
 func (odr *LesOdr) Retrieve(ctx context.Context, req light.OdrRequest) (err error) {
 	lreq := LesRequest(req)
 
-	reqID := genReqID()
+	reqID := rand.Uint64()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
 			return lreq.GetCost(dp.(*serverPeer))

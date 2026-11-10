@@ -1,22 +1,23 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package enr
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -60,7 +61,7 @@ type TCP uint16
 
 func (v TCP) ENRKey() string { return "tcp" }
 
-// UDP is the "udp" key, which holds the IPv6-specific UDP port of the node.
+// TCP6 is the "tcp6" key, which holds the IPv6-specific tcp6 port of the node.
 type TCP6 uint16
 
 func (v TCP6) ENRKey() string { return "tcp6" }
@@ -70,7 +71,7 @@ type UDP uint16
 
 func (v UDP) ENRKey() string { return "udp" }
 
-// UDP is the "udp" key, which holds the IPv6-specific UDP port of the node.
+// UDP6 is the "udp6" key, which holds the IPv6-specific UDP port of the node.
 type UDP6 uint16
 
 func (v UDP6) ENRKey() string { return "udp6" }
@@ -180,9 +181,16 @@ func (err *KeyError) Error() string {
 	return fmt.Sprintf("ENR key %q: %v", err.Key, err.Err)
 }
 
+func (err *KeyError) Unwrap() error {
+	return err.Err
+}
+
 // IsNotFound reports whether the given error means that a key/value pair is
 // missing from a record.
 func IsNotFound(err error) bool {
-	kerr, ok := err.(*KeyError)
-	return ok && kerr.Err == errNotFound
+	var ke *KeyError
+	if errors.As(err, &ke) {
+		return ke.Err == errNotFound
+	}
+	return false
 }

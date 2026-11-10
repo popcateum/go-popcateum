@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
+// go-ethereum is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
+// GNU General Public License for more details.
 //
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 package ethtest
 
@@ -35,17 +35,17 @@ var (
 )
 
 func TestEthSuite(t *testing.T) {
-	gpop, err := runGpop()
+	geth, err := runGeth()
 	if err != nil {
-		t.Fatalf("could not run gpop: %v", err)
+		t.Fatalf("could not run geth: %v", err)
 	}
-	defer gpop.Close()
+	defer geth.Close()
 
-	suite, err := NewSuite(gpop.Server().Self(), fullchainFile, genesisFile)
+	suite, err := NewSuite(geth.Server().Self(), fullchainFile, genesisFile)
 	if err != nil {
 		t.Fatalf("could not create new test suite: %v", err)
 	}
-	for _, test := range suite.AllEthTests() {
+	for _, test := range suite.EthTests() {
 		t.Run(test.Name, func(t *testing.T) {
 			result := utesting.RunTAP([]utesting.Test{{Name: test.Name, Fn: test.Fn}}, os.Stdout)
 			if result[0].Failed {
@@ -55,8 +55,29 @@ func TestEthSuite(t *testing.T) {
 	}
 }
 
-// runGpop creates and starts a gpop node
-func runGpop() (*node.Node, error) {
+func TestSnapSuite(t *testing.T) {
+	geth, err := runGeth()
+	if err != nil {
+		t.Fatalf("could not run geth: %v", err)
+	}
+	defer geth.Close()
+
+	suite, err := NewSuite(geth.Server().Self(), fullchainFile, genesisFile)
+	if err != nil {
+		t.Fatalf("could not create new test suite: %v", err)
+	}
+	for _, test := range suite.SnapTests() {
+		t.Run(test.Name, func(t *testing.T) {
+			result := utesting.RunTAP([]utesting.Test{{Name: test.Name, Fn: test.Fn}}, os.Stdout)
+			if result[0].Failed {
+				t.Fatal()
+			}
+		})
+	}
+}
+
+// runGeth creates and starts a geth node
+func runGeth() (*node.Node, error) {
 	stack, err := node.New(&node.Config{
 		P2P: p2p.Config{
 			ListenAddr:  "127.0.0.1:0",
@@ -69,7 +90,7 @@ func runGpop() (*node.Node, error) {
 		return nil, err
 	}
 
-	err = setupGpop(stack)
+	err = setupGeth(stack)
 	if err != nil {
 		stack.Close()
 		return nil, err
@@ -81,7 +102,7 @@ func runGpop() (*node.Node, error) {
 	return stack, nil
 }
 
-func setupGpop(stack *node.Node) error {
+func setupGeth(stack *node.Node) error {
 	chain, err := loadChain(halfchainFile, genesisFile)
 	if err != nil {
 		return err

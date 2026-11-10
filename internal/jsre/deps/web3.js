@@ -1768,27 +1768,27 @@ var ETH_UNITS = [
     'Gwei',
     'szabo',
     'finney',
-    'femtopopcat',
-    'picopopcat',
-    'nanopopcat',
-    'micropopcat',
-    'millipopcat',
+    'femtoether',
+    'picoether',
+    'nanoether',
+    'microether',
+    'milliether',
     'nano',
     'micro',
     'milli',
-    'popcat',
+    'ether',
     'grand',
-    'Mpopcat',
-    'Gpopcat',
-    'Tpopcat',
-    'Ppopcat',
-    'Epopcat',
-    'Zpopcat',
-    'Ypopcat',
-    'Npopcat',
-    'Dpopcat',
-    'Vpopcat',
-    'Upopcat'
+    'Mether',
+    'Gether',
+    'Tether',
+    'Pether',
+    'Eether',
+    'Zether',
+    'Yether',
+    'Nether',
+    'Dether',
+    'Vether',
+    'Uether'
 ];
 
 module.exports = {
@@ -1884,33 +1884,33 @@ var sha3 = require('./sha3.js');
 var utf8 = require('utf8');
 
 var unitMap = {
-    'nopopcat':      '0',
+    'noether':      '0',
     'wei':          '1',
     'kwei':         '1000',
     'Kwei':         '1000',
     'babbage':      '1000',
-    'femtopopcat':   '1000',
+    'femtoether':   '1000',
     'mwei':         '1000000',
     'Mwei':         '1000000',
     'lovelace':     '1000000',
-    'picopopcat':    '1000000',
+    'picoether':    '1000000',
     'gwei':         '1000000000',
     'Gwei':         '1000000000',
     'shannon':      '1000000000',
-    'nanopopcat':    '1000000000',
+    'nanoether':    '1000000000',
     'nano':         '1000000000',
     'szabo':        '1000000000000',
-    'micropopcat':   '1000000000000',
+    'microether':   '1000000000000',
     'micro':        '1000000000000',
     'finney':       '1000000000000000',
-    'millipopcat':    '1000000000000000',
+    'milliether':    '1000000000000000',
     'milli':         '1000000000000000',
-    'popcat':        '1000000000000000000',
-    'kpopcat':       '1000000000000000000000',
+    'ether':        '1000000000000000000',
+    'kether':       '1000000000000000000000',
     'grand':        '1000000000000000000000',
-    'mpopcat':       '1000000000000000000000000',
-    'gpopcat':       '1000000000000000000000000000',
-    'tpopcat':       '1000000000000000000000000000000'
+    'mether':       '1000000000000000000000000',
+    'gether':       '1000000000000000000000000000',
+    'tether':       '1000000000000000000000000000000'
 };
 
 /**
@@ -2124,12 +2124,12 @@ var toHex = function (val) {
  * Returns value of unit in Wei
  *
  * @method getValueOfUnit
- * @param {String} unit the unit to convert to, default popcat
+ * @param {String} unit the unit to convert to, default ether
  * @returns {BigNumber} value of the unit (in Wei)
  * @throws error if the unit is not correct:w
  */
 var getValueOfUnit = function (unit) {
-    unit = unit ? unit.toLowerCase() : 'popcat';
+    unit = unit ? unit.toLowerCase() : 'ether';
     var unitValue = unitMap[unit];
     if (unitValue === undefined) {
         throw new Error('This unit doesn\'t exists, please use the one of the following units' + JSON.stringify(unitMap, null, 2));
@@ -2138,24 +2138,24 @@ var getValueOfUnit = function (unit) {
 };
 
 /**
- * Takes a number of wei and converts it to any other popcat unit.
+ * Takes a number of wei and converts it to any other ether unit.
  *
  * Possible units are:
  *   SI Short   SI Full        Effigy       Other
- * - kwei       femtopopcat     babbage
- * - mwei       picopopcat      lovelace
- * - gwei       nanopopcat      shannon      nano
- * - --         micropopcat     szabo        micro
- * - --         millipopcat     finney       milli
- * - popcat      --             --
- * - kpopcat                    --           grand
- * - mpopcat
- * - gpopcat
- * - tpopcat
+ * - kwei       femtoether     babbage
+ * - mwei       picoether      lovelace
+ * - gwei       nanoether      shannon      nano
+ * - --         microether     szabo        micro
+ * - --         milliether     finney       milli
+ * - ether      --             --
+ * - kether                    --           grand
+ * - mether
+ * - gether
+ * - tether
  *
  * @method fromWei
  * @param {Number|String} number can be a number, number string or a HEX of a decimal
- * @param {String} unit the unit to convert to, default popcat
+ * @param {String} unit the unit to convert to, default ether
  * @return {String|Object} When given a BigNumber object it returns one as well, otherwise a number
 */
 var fromWei = function(number, unit) {
@@ -2169,21 +2169,21 @@ var fromWei = function(number, unit) {
  *
  * Possible units are:
  *   SI Short   SI Full        Effigy       Other
- * - kwei       femtopopcat     babbage
- * - mwei       picopopcat      lovelace
- * - gwei       nanopopcat      shannon      nano
- * - --         micropopcat     szabo        micro
- * - --         micropopcat     szabo        micro
- * - --         millipopcat     finney       milli
- * - popcat      --             --
- * - kpopcat                    --           grand
- * - mpopcat
- * - gpopcat
- * - tpopcat
+ * - kwei       femtoether     babbage
+ * - mwei       picoether      lovelace
+ * - gwei       nanoether      shannon      nano
+ * - --         microether     szabo        micro
+ * - --         microether     szabo        micro
+ * - --         milliether     finney       milli
+ * - ether      --             --
+ * - kether                    --           grand
+ * - mether
+ * - gether
+ * - tether
  *
  * @method toWei
  * @param {Number|String|BigNumber} number can be a number, number string or a HEX of a decimal
- * @param {String} unit the unit to convert from, default popcat
+ * @param {String} unit the unit to convert from, default ether
  * @return {String|Object} When given a BigNumber object it returns one as well, otherwise a number
 */
 var toWei = function(number, unit) {
@@ -2409,7 +2409,7 @@ var isJson = function (str) {
 };
 
 /**
- * Returns true if given string is a valid Popcateum block header bloom.
+ * Returns true if given string is a valid Ethereum block header bloom.
  *
  * @method isBloom
  * @param {String} hex encoded bloom filter
@@ -2609,7 +2609,7 @@ var properties = function () {
             inputFormatter: utils.toDecimal
         }),
         new Property({
-            name: 'version.popcateum',
+            name: 'version.ethereum',
             getter: 'eth_protocolVersion',
             inputFormatter: utils.toDecimal
         }),
@@ -3696,7 +3696,7 @@ var outputBigNumberFormatter = function (number) {
 };
 
 var isPredefinedBlockNumber = function (blockNumber) {
-    return blockNumber === 'latest' || blockNumber === 'pending' || blockNumber === 'earliest';
+    return blockNumber === 'latest' || blockNumber === 'pending' || blockNumber === 'earliest' || blockNumber === 'finalized' || blockNumber === 'safe';
 };
 
 var inputDefaultBlockNumberFormatter = function (blockNumber) {
@@ -3734,7 +3734,7 @@ var inputCallFormatter = function (options){
         options.to = inputAddressFormatter(options.to);
     }
 
-    ['gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
+    ['maxFeePerGas', 'maxPriorityFeePerGas', 'gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
         return options[key] !== undefined;
     }).forEach(function(key){
         options[key] = utils.fromDecimal(options[key]);
@@ -3759,7 +3759,7 @@ var inputTransactionFormatter = function (options){
         options.to = inputAddressFormatter(options.to);
     }
 
-    ['gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
+    ['maxFeePerGas', 'maxPriorityFeePerGas', 'gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
         return options[key] !== undefined;
     }).forEach(function(key){
         options[key] = utils.fromDecimal(options[key]);
@@ -3783,6 +3783,12 @@ var outputTransactionFormatter = function (tx){
     tx.nonce = utils.toDecimal(tx.nonce);
     tx.gas = utils.toDecimal(tx.gas);
     tx.gasPrice = utils.toBigNumber(tx.gasPrice);
+    if(tx.maxFeePerGas !== undefined) {
+      tx.maxFeePerGas = utils.toBigNumber(tx.maxFeePerGas);
+    }
+    if(tx.maxPriorityFeePerGas !== undefined) {
+      tx.maxPriorityFeePerGas = utils.toBigNumber(tx.maxPriorityFeePerGas);
+    }
     tx.value = utils.toBigNumber(tx.value);
     return tx;
 };
@@ -3801,7 +3807,9 @@ var outputTransactionReceiptFormatter = function (receipt){
         receipt.transactionIndex = utils.toDecimal(receipt.transactionIndex);
     receipt.cumulativeGasUsed = utils.toDecimal(receipt.cumulativeGasUsed);
     receipt.gasUsed = utils.toDecimal(receipt.gasUsed);
-
+    if(receipt.effectiveGasPrice !== undefined) {
+      receipt.effectiveGasPrice = utils.toBigNumber(receipt.effectiveGasPrice);
+    }
     if(utils.isArray(receipt.logs)) {
         receipt.logs = receipt.logs.map(function(log){
             return outputLogFormatter(log);
@@ -3819,8 +3827,10 @@ var outputTransactionReceiptFormatter = function (receipt){
  * @returns {Object}
 */
 var outputBlockFormatter = function(block) {
-
     // transform to number
+    if (block.baseFeePerGas !== undefined) {
+      block.baseFeePerGas = utils.toBigNumber(block.baseFeePerGas);
+    }
     block.gasLimit = utils.toDecimal(block.gasLimit);
     block.gasUsed = utils.toDecimal(block.gasUsed);
     block.size = utils.toDecimal(block.size);
@@ -3939,10 +3949,18 @@ var outputSyncingFormatter = function(result) {
     result.startingBlock = utils.toDecimal(result.startingBlock);
     result.currentBlock = utils.toDecimal(result.currentBlock);
     result.highestBlock = utils.toDecimal(result.highestBlock);
-    if (result.knownStates) {
-        result.knownStates = utils.toDecimal(result.knownStates);
-        result.pulledStates = utils.toDecimal(result.pulledStates);
-    }
+    result.syncedAccounts = utils.toDecimal(result.syncedAccounts);
+    result.syncedAccountBytes = utils.toDecimal(result.syncedAccountBytes);
+    result.syncedBytecodes = utils.toDecimal(result.syncedBytecodes);
+    result.syncedBytecodeBytes = utils.toDecimal(result.syncedBytecodeBytes);
+    result.syncedStorage = utils.toDecimal(result.syncedStorage);
+    result.syncedStorageBytes = utils.toDecimal(result.syncedStorageBytes);
+    result.healedTrienodes = utils.toDecimal(result.healedTrienodes);
+    result.healedTrienodeBytes = utils.toDecimal(result.healedTrienodeBytes);
+    result.healedBytecodes = utils.toDecimal(result.healedBytecodes);
+    result.healedBytecodeBytes = utils.toDecimal(result.healedBytecodeBytes);
+    result.healingTrienodes = utils.toDecimal(result.healingTrienodes);
+    result.healingBytecode = utils.toDecimal(result.healingBytecode);
 
     return result;
 };
@@ -4292,7 +4310,7 @@ var XHR2 = require('xhr2'); // jshint ignore: line
  * HttpProvider should be used to send rpc calls over http
  */
 var HttpProvider = function (host, timeout, user, password) {
-  this.host = host || 'http://localhost:9506';
+  this.host = host || 'http://localhost:8545';
   this.timeout = timeout || 0;
   this.user = user;
   this.password = password;
@@ -4496,7 +4514,7 @@ var Iban = function (iban) {
 };
 
 /**
- * This method should be used to create iban object from popcateum address
+ * This method should be used to create iban object from ethereum address
  *
  * @method fromAddress
  * @param {String} address
@@ -5713,7 +5731,7 @@ module.exports = Personal;
 */
 /** @file shh.js
  * @authors:
- *   Fabian Vogelsteller <fabian@popcateum.org>
+ *   Fabian Vogelsteller <fabian@ethereum.org>
  *   Marek Kotewicz <marek@ethcore.io>
  * @date 2017
  */
@@ -6317,7 +6335,7 @@ var errors = require('./errors');
 
 /**
  * It's responsible for passing messages to providers
- * It's also responsible for polling the popcateum node for incoming messages
+ * It's also responsible for polling the ethereum node for incoming messages
  * Default poll timeout is 1 second
  * Singleton
  */
@@ -10875,7 +10893,7 @@ module.exports = transfer;
 	    - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 	    - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHPOPCAT IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	*/
 
 	(function (Math) {
@@ -13625,4 +13643,4 @@ if (typeof window !== 'undefined' && typeof window.Web3 === 'undefined') {
 module.exports = Web3;
 
 },{"./lib/web3":22}]},{},["web3"])
-//# sourceMappingURL=web3-light.js.map
+

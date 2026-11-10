@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package eth
 
@@ -41,7 +41,7 @@ var (
 	errPeerNotRegistered = errors.New("peer not registered")
 
 	// errSnapWithoutEth is returned if a peer attempts to connect only on the
-	// snap protocol without advertizing the eth main protocol.
+	// snap protocol without advertising the eth main protocol.
 	errSnapWithoutEth = errors.New("peer connected on snap without compatible eth support")
 )
 
@@ -230,7 +230,7 @@ func (ps *peerSet) snapLen() int {
 }
 
 // peerWithHighestTD retrieves the known peer with the currently highest total
-// difficulty.
+// difficulty, but below the given PoS switchover threshold.
 func (ps *peerSet) peerWithHighestTD() *eth.Peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()

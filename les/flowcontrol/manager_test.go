@@ -1,22 +1,23 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package flowcontrol
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -44,16 +45,17 @@ const (
 // maximum permitted rate. The max capacity nodes are changed multiple times during
 // a single test.
 func TestConstantTotalCapacity(t *testing.T) {
-	testConstantTotalCapacity(t, 10, 1, 0)
-	testConstantTotalCapacity(t, 10, 1, 1)
-	testConstantTotalCapacity(t, 30, 1, 0)
-	testConstantTotalCapacity(t, 30, 2, 3)
-	testConstantTotalCapacity(t, 100, 1, 0)
-	testConstantTotalCapacity(t, 100, 3, 5)
-	testConstantTotalCapacity(t, 100, 5, 10)
+	testConstantTotalCapacity(t, 10, 1, 0, false)
+	testConstantTotalCapacity(t, 10, 1, 1, false)
+	testConstantTotalCapacity(t, 30, 1, 0, false)
+	testConstantTotalCapacity(t, 30, 2, 3, false)
+	testConstantTotalCapacity(t, 100, 1, 0, false)
+	testConstantTotalCapacity(t, 100, 3, 5, false)
+	testConstantTotalCapacity(t, 100, 5, 10, false)
+	testConstantTotalCapacity(t, 100, 3, 5, true)
 }
 
-func testConstantTotalCapacity(t *testing.T, nodeCount, maxCapacityNodes, randomSend int) {
+func testConstantTotalCapacity(t *testing.T, nodeCount, maxCapacityNodes, randomSend int, priorityOverflow bool) {
 	clock := &mclock.Simulated{}
 	nodes := make([]*testNode, nodeCount)
 	var totalCapacity uint64
@@ -62,6 +64,10 @@ func testConstantTotalCapacity(t *testing.T, nodeCount, maxCapacityNodes, random
 		totalCapacity += nodes[i].capacity
 	}
 	m := NewClientManager(PieceWiseLinear{{0, totalCapacity}}, clock)
+	if priorityOverflow {
+		// provoke a situation where rcLastUpdate overflow needs to be handled
+		m.rcLastIntValue = math.MaxInt64 - 10000000000
+	}
 	for _, n := range nodes {
 		n.bufLimit = n.capacity * 6000
 		n.node = NewClientNode(m, ServerParams{BufLimit: n.bufLimit, MinRecharge: n.capacity})
@@ -104,7 +110,6 @@ func testConstantTotalCapacity(t *testing.T, nodeCount, maxCapacityNodes, random
 	if ratio < 0.98 || ratio > 1.02 {
 		t.Errorf("totalCost/totalCapacity/testLength ratio incorrect (expected: 1, got: %f)", ratio)
 	}
-
 }
 
 func (n *testNode) send(t *testing.T, now mclock.AbsTime) bool {

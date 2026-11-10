@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bloombits
 
@@ -124,13 +124,13 @@ func makeRandomIndexes(lengths []int, max int) [][]bloomIndexes {
 
 // testMatcherDiffBatches runs the given matches test in single-delivery and also
 // in batches delivery mode, verifying that all kinds of deliveries are handled
-// correctly withn.
+// correctly within.
 func testMatcherDiffBatches(t *testing.T, filter [][]bloomIndexes, start, blocks uint64, intermittent bool, retrievals uint32) {
 	singleton := testMatcher(t, filter, start, blocks, intermittent, retrievals, 1)
 	batched := testMatcher(t, filter, start, blocks, intermittent, retrievals, 16)
 
 	if singleton != batched {
-		t.Errorf("filter = %v blocks = %v intermittent = %v: request count mismatch, %v in signleton vs. %v in batched mode", filter, blocks, intermittent, singleton, batched)
+		t.Errorf("filter = %v blocks = %v intermittent = %v: request count mismatch, %v in singleton vs. %v in batched mode", filter, blocks, intermittent, singleton, batched)
 	}
 }
 
@@ -160,7 +160,7 @@ func testMatcher(t *testing.T, filter [][]bloomIndexes, start, blocks uint64, in
 		}
 	}
 	// Track the number of retrieval requests made
-	var requested uint32
+	var requested atomic.Uint32
 
 	// Start the matching session for the filter and the retriever goroutines
 	quit := make(chan struct{})
@@ -208,15 +208,15 @@ func testMatcher(t *testing.T, filter [][]bloomIndexes, start, blocks uint64, in
 	session.Close()
 	close(quit)
 
-	if retrievals != 0 && requested != retrievals {
-		t.Errorf("filter = %v  blocks = %v  intermittent = %v: request count mismatch, have #%v, want #%v", filter, blocks, intermittent, requested, retrievals)
+	if retrievals != 0 && requested.Load() != retrievals {
+		t.Errorf("filter = %v  blocks = %v  intermittent = %v: request count mismatch, have #%v, want #%v", filter, blocks, intermittent, requested.Load(), retrievals)
 	}
-	return requested
+	return requested.Load()
 }
 
 // startRetrievers starts a batch of goroutines listening for section requests
 // and serving them.
-func startRetrievers(session *MatcherSession, quit chan struct{}, retrievals *uint32, batch int) {
+func startRetrievers(session *MatcherSession, quit chan struct{}, retrievals *atomic.Uint32, batch int) {
 	requests := make(chan chan *Retrieval)
 
 	for i := 0; i < 10; i++ {
@@ -238,7 +238,7 @@ func startRetrievers(session *MatcherSession, quit chan struct{}, retrievals *ui
 					for i, section := range task.Sections {
 						if rand.Int()%4 != 0 { // Handle occasional missing deliveries
 							task.Bitsets[i] = generateBitset(task.Bit, section)
-							atomic.AddUint32(retrievals, 1)
+							retrievals.Add(1)
 						}
 					}
 					request <- task

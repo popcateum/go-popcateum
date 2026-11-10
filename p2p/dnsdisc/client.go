@@ -1,24 +1,25 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package dnsdisc
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -26,12 +27,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/popcateum/go-popcateum/common/lru"
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/crypto"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/p2p/enr"
-	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 )
@@ -40,7 +41,7 @@ import (
 type Client struct {
 	cfg          Config
 	clock        mclock.Clock
-	entries      *lru.Cache
+	entries      *lru.Cache[string, entry]
 	ratelimit    *rate.Limiter
 	singleflight singleflight.Group
 }
@@ -95,14 +96,10 @@ func (cfg Config) withDefaults() Config {
 // NewClient creates a client.
 func NewClient(cfg Config) *Client {
 	cfg = cfg.withDefaults()
-	cache, err := lru.New(cfg.CacheLimit)
-	if err != nil {
-		panic(err)
-	}
 	rlimit := rate.NewLimiter(rate.Limit(cfg.RateLimit), 10)
 	return &Client{
 		cfg:       cfg,
-		entries:   cache,
+		entries:   lru.NewCache[string, entry](cfg.CacheLimit),
 		clock:     mclock.System{},
 		ratelimit: rlimit,
 	}
@@ -175,7 +172,7 @@ func (c *Client) resolveEntry(ctx context.Context, domain, hash string) (entry, 
 	}
 	cacheKey := truncateHash(hash)
 	if e, ok := c.entries.Get(cacheKey); ok {
-		return e.(entry), nil
+		return e, nil
 	}
 
 	ei, err, _ := c.singleflight.Do(cacheKey, func() (interface{}, error) {
@@ -204,7 +201,7 @@ func (c *Client) doResolveEntry(ctx context.Context, domain, hash string) (entry
 	}
 	for _, txt := range txts {
 		e, err := parseEntry(txt, c.cfg.ValidSchemes)
-		if err == errUnknownEntry {
+		if errors.Is(err, errUnknownEntry) {
 			continue
 		}
 		if !bytes.HasPrefix(crypto.Keccak256([]byte(txt)), wantHash) {
@@ -281,7 +278,7 @@ func (it *randomIterator) nextNode() *enode.Node {
 		}
 		n, err := ct.syncRandom(it.ctx)
 		if err != nil {
-			if err == it.ctx.Err() {
+			if errors.Is(err, it.ctx.Err()) {
 				return nil // context canceled.
 			}
 			it.c.cfg.Logger.Debug("Error in DNS random node sync", "tree", ct.loc.domain, "err", err)
@@ -297,6 +294,12 @@ func (it *randomIterator) nextNode() *enode.Node {
 func (it *randomIterator) pickTree() *clientTree {
 	it.mu.Lock()
 	defer it.mu.Unlock()
+
+	// First check if iterator was closed.
+	// Need to do this here to avoid nil map access in rebuildTrees.
+	if it.trees == nil {
+		return nil
+	}
 
 	// Rebuild the trees map if any links have changed.
 	if it.lc.changed {

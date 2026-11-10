@@ -1,19 +1,20 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+//go:build none
 // +build none
 
 /*
@@ -39,7 +40,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -68,7 +68,9 @@ var (
 		"common/bitutil/bitutil",
 		"common/prque/",
 		"consensus/ethash/xor.go",
+		"crypto/blake2b/",
 		"crypto/bn256/",
+		"crypto/bls12381/",
 		"crypto/ecies/",
 		"graphql/graphiql.go",
 		"internal/jsre/deps",
@@ -88,13 +90,13 @@ var (
 	licenseCommentRE = regexp.MustCompile(`^//\s*(Copyright|This file is part of).*?\n(?://.*?\n)*\n*`)
 
 	// this text appears at the start of AUTHORS
-	authorsFileHeader = "# This is the official list of go-popcateum authors for copyright purposes.\n\n"
+	authorsFileHeader = "# This is the official list of go-ethereum authors for copyright purposes.\n\n"
 )
 
 // this template generates the license comment.
 // its input is an info structure.
 var licenseT = template.Must(template.New("").Parse(`
-// Copyright {{.Year}} The go-popcateum Authors
+// Copyright {{.Year}} The go-ethereum Authors
 // This file is part of {{.Whole false}}.
 //
 // {{.Whole true}} is free software: you can redistribute it and/or modify
@@ -133,12 +135,12 @@ func (i info) ShortLicense() string {
 
 func (i info) Whole(startOfSentence bool) string {
 	if i.gpl() {
-		return "go-popcateum"
+		return "go-ethereum"
 	}
 	if startOfSentence {
-		return "The go-popcateum library"
+		return "The go-ethereum library"
 	}
-	return "the go-popcateum library"
+	return "the go-ethereum library"
 }
 
 func (i info) gpl() bool {
@@ -241,7 +243,7 @@ func gitAuthors(files []string) []string {
 }
 
 func readAuthors() []string {
-	content, err := ioutil.ReadFile("AUTHORS")
+	content, err := os.ReadFile("AUTHORS")
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalln("error reading AUTHORS:", err)
 	}
@@ -305,7 +307,7 @@ func writeAuthors(files []string) {
 		content.WriteString("\n")
 	}
 	fmt.Println("writing AUTHORS")
-	if err := ioutil.WriteFile("AUTHORS", content.Bytes(), 0644); err != nil {
+	if err := os.WriteFile("AUTHORS", content.Bytes(), 0644); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -340,7 +342,10 @@ func isGenerated(file string) bool {
 	}
 	defer fd.Close()
 	buf := make([]byte, 2048)
-	n, _ := fd.Read(buf)
+	n, err := fd.Read(buf)
+	if err != nil {
+		return false
+	}
 	buf = buf[:n]
 	for _, l := range bytes.Split(buf, []byte("\n")) {
 		if bytes.HasPrefix(l, []byte("// Code generated")) {
@@ -381,7 +386,7 @@ func writeLicense(info *info) {
 	if err != nil {
 		log.Fatalf("error stat'ing %s: %v\n", info.file, err)
 	}
-	content, err := ioutil.ReadFile(info.file)
+	content, err := os.ReadFile(info.file)
 	if err != nil {
 		log.Fatalf("error reading %s: %v\n", info.file, err)
 	}
@@ -400,7 +405,7 @@ func writeLicense(info *info) {
 		return
 	}
 	fmt.Println("writing", info.ShortLicense(), info.file)
-	if err := ioutil.WriteFile(info.file, buf.Bytes(), fi.Mode()); err != nil {
+	if err := os.WriteFile(info.file, buf.Bytes(), fi.Mode()); err != nil {
 		log.Fatalf("error writing %s: %v", info.file, err)
 	}
 }

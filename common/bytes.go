@@ -1,24 +1,27 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package common contains various helper functions.
 package common
 
 import (
 	"encoding/hex"
+	"errors"
+
+	"github.com/popcateum/go-popcateum/common/hexutil"
 )
 
 // FromHex returns the bytes represented by the hexadecimal string s.
@@ -90,6 +93,15 @@ func Hex2BytesFixed(str string, flen int) []byte {
 	hh := make([]byte, flen)
 	copy(hh[flen-len(h):flen], h)
 	return hh
+}
+
+// ParseHexOrString tries to hexdecode b, but if the prefix is missing, it instead just returns the raw bytes
+func ParseHexOrString(str string) ([]byte, error) {
+	b, err := hexutil.Decode(str)
+	if errors.Is(err, hexutil.ErrMissingPrefix) {
+		return []byte(str), nil
+	}
+	return b, err
 }
 
 // RightPadBytes zero-pads slice to the right up to length l.

@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package miner
 
@@ -74,7 +74,7 @@ func TestUnconfirmedShifts(t *testing.T) {
 	if n := pool.blocks.Len(); n != int(limit)/2 {
 		t.Errorf("unconfirmed count mismatch: have %d, want %d", n, limit/2)
 	}
-	// Try to shift all the remaining blocks out and verify emptyness
+	// Try to shift all the remaining blocks out and verify emptiness
 	pool.Shift(start + 2*uint64(limit))
 	if n := pool.blocks.Len(); n != 0 {
 		t.Errorf("unconfirmed count mismatch: have %d, want %d", n, 0)

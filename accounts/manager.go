@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package accounts
 
@@ -25,6 +25,10 @@ import (
 	"github.com/popcateum/go-popcateum/event"
 )
 
+// managerSubBufferSize determines how many incoming wallet events
+// the manager will buffer in its channel.
+const managerSubBufferSize = 50
+
 // Config contains the settings of the global account manager.
 //
 // TODO(rjl493456442, karalabe, holiman): Get rid of this when account management
@@ -33,18 +37,27 @@ type Config struct {
 	InsecureUnlockAllowed bool // Whether account unlocking in insecure environment is allowed
 }
 
+// newBackendEvent lets the manager know it should
+// track the given backend for wallet updates.
+type newBackendEvent struct {
+	backend   Backend
+	processed chan struct{} // Informs event emitter that backend has been integrated
+}
+
 // Manager is an overarching account manager that can communicate with various
 // backends for signing transactions.
 type Manager struct {
-	config   *Config                    // Global account manager configurations
-	backends map[reflect.Type][]Backend // Index of backends currently registered
-	updaters []event.Subscription       // Wallet update subscriptions for all backends
-	updates  chan WalletEvent           // Subscription sink for backend wallet changes
-	wallets  []Wallet                   // Cache of all wallets from all registered backends
+	config      *Config                    // Global account manager configurations
+	backends    map[reflect.Type][]Backend // Index of backends currently registered
+	updaters    []event.Subscription       // Wallet update subscriptions for all backends
+	updates     chan WalletEvent           // Subscription sink for backend wallet changes
+	newBackends chan newBackendEvent       // Incoming backends to be tracked by the manager
+	wallets     []Wallet                   // Cache of all wallets from all registered backends
 
 	feed event.Feed // Wallet feed notifying of arrivals/departures
 
 	quit chan chan error
+	term chan struct{} // Channel is closed upon termination of the update loop
 	lock sync.RWMutex
 }
 
@@ -57,7 +70,7 @@ func NewManager(config *Config, backends ...Backend) *Manager {
 		wallets = merge(wallets, backend.Wallets()...)
 	}
 	// Subscribe to wallet notifications from all backends
-	updates := make(chan WalletEvent, 4*len(backends))
+	updates := make(chan WalletEvent, managerSubBufferSize)
 
 	subs := make([]event.Subscription, len(backends))
 	for i, backend := range backends {
@@ -65,12 +78,14 @@ func NewManager(config *Config, backends ...Backend) *Manager {
 	}
 	// Assemble the account manager and return
 	am := &Manager{
-		config:   config,
-		backends: make(map[reflect.Type][]Backend),
-		updaters: subs,
-		updates:  updates,
-		wallets:  wallets,
-		quit:     make(chan chan error),
+		config:      config,
+		backends:    make(map[reflect.Type][]Backend),
+		updaters:    subs,
+		updates:     updates,
+		newBackends: make(chan newBackendEvent),
+		wallets:     wallets,
+		quit:        make(chan chan error),
+		term:        make(chan struct{}),
 	}
 	for _, backend := range backends {
 		kind := reflect.TypeOf(backend)
@@ -91,6 +106,14 @@ func (am *Manager) Close() error {
 // Config returns the configuration of account manager.
 func (am *Manager) Config() *Config {
 	return am.config
+}
+
+// AddBackend starts the tracking of an additional backend for wallet updates.
+// cmd/geth assumes once this func returns the backends have been already integrated.
+func (am *Manager) AddBackend(backend Backend) {
+	done := make(chan struct{})
+	am.newBackends <- newBackendEvent{backend, done}
+	<-done
 }
 
 // update is the wallet event loop listening for notifications from the backends
@@ -122,10 +145,22 @@ func (am *Manager) update() {
 
 			// Notify any listeners of the event
 			am.feed.Send(event)
-
+		case event := <-am.newBackends:
+			am.lock.Lock()
+			// Update caches
+			backend := event.backend
+			am.wallets = merge(am.wallets, backend.Wallets()...)
+			am.updaters = append(am.updaters, backend.Subscribe(am.updates))
+			kind := reflect.TypeOf(backend)
+			am.backends[kind] = append(am.backends[kind], backend)
+			am.lock.Unlock()
+			close(event.processed)
 		case errc := <-am.quit:
 			// Manager terminating, return
 			errc <- nil
+			// Signals event emitters the loop is not receiving values
+			// to prevent them from getting stuck.
+			close(am.term)
 			return
 		}
 	}
@@ -133,6 +168,9 @@ func (am *Manager) update() {
 
 // Backends retrieves the backend(s) with the given type from the account manager.
 func (am *Manager) Backends(kind reflect.Type) []Backend {
+	am.lock.RLock()
+	defer am.lock.RUnlock()
+
 	return am.backends[kind]
 }
 
@@ -219,7 +257,7 @@ func merge(slice []Wallet, wallets ...Wallet) []Wallet {
 	return slice
 }
 
-// drop is the couterpart of merge, which looks up wallets from within the sorted
+// drop is the counterpart of merge, which looks up wallets from within the sorted
 // cache and removes the ones specified.
 func drop(slice []Wallet, wallets ...Wallet) []Wallet {
 	for _, wallet := range wallets {

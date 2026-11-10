@@ -1,23 +1,25 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package miner implements Popcateum block creation and mining.
+// Package miner implements Ethereum block creation and mining.
 package miner
 
 import (
+	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -26,20 +28,20 @@ import (
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/core/state"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/core/vm"
 	"github.com/popcateum/go-popcateum/eth/downloader"
-	"github.com/popcateum/go-popcateum/ethdb/memorydb"
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/trie"
 )
 
 type mockBackend struct {
 	bc     *core.BlockChain
-	txPool *core.TxPool
+	txPool *txpool.TxPool
 }
 
-func NewMockBackend(bc *core.BlockChain, txPool *core.TxPool) *mockBackend {
+func NewMockBackend(bc *core.BlockChain, txPool *txpool.TxPool) *mockBackend {
 	return &mockBackend{
 		bc:     bc,
 		txPool: txPool,
@@ -50,8 +52,12 @@ func (m *mockBackend) BlockChain() *core.BlockChain {
 	return m.bc
 }
 
-func (m *mockBackend) TxPool() *core.TxPool {
+func (m *mockBackend) TxPool() *txpool.TxPool {
 	return m.txPool
+}
+
+func (m *mockBackend) StateAtBlock(block *types.Block, reexec uint64, base *state.StateDB, checkLive bool, preferDisk bool) (statedb *state.StateDB, err error) {
+	return nil, errors.New("not supported")
 }
 
 type testBlockChain struct {
@@ -60,14 +66,15 @@ type testBlockChain struct {
 	chainHeadFeed *event.Feed
 }
 
-func (bc *testBlockChain) CurrentBlock() *types.Block {
-	return types.NewBlock(&types.Header{
+func (bc *testBlockChain) CurrentBlock() *types.Header {
+	return &types.Header{
+		Number:   new(big.Int),
 		GasLimit: bc.gasLimit,
-	}, nil, nil, nil, trie.NewStackTrie(nil))
+	}
 }
 
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
-	return bc.CurrentBlock()
+	return types.NewBlock(bc.CurrentBlock(), nil, nil, nil, trie.NewStackTrie(nil))
 }
 
 func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
@@ -79,8 +86,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 
 func TestMiner(t *testing.T) {
-	miner, mux := createMiner(t)
-	miner.Start(common.HexToAddress("0x12345"))
+	miner, mux, cleanup := createMiner(t)
+	defer cleanup(false)
+
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -106,8 +115,10 @@ func TestMiner(t *testing.T) {
 // An initial FailedEvent should allow mining to stop on a subsequent
 // downloader StartEvent.
 func TestMinerDownloaderFirstFails(t *testing.T) {
-	miner, mux := createMiner(t)
-	miner.Start(common.HexToAddress("0x12345"))
+	miner, mux, cleanup := createMiner(t)
+	defer cleanup(false)
+
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -137,9 +148,10 @@ func TestMinerDownloaderFirstFails(t *testing.T) {
 }
 
 func TestMinerStartStopAfterDownloaderEvents(t *testing.T) {
-	miner, mux := createMiner(t)
+	miner, mux, cleanup := createMiner(t)
+	defer cleanup(false)
 
-	miner.Start(common.HexToAddress("0x12345"))
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
@@ -152,7 +164,7 @@ func TestMinerStartStopAfterDownloaderEvents(t *testing.T) {
 	miner.Stop()
 	waitForMiningState(t, miner, false)
 
-	miner.Start(common.HexToAddress("0x678910"))
+	miner.Start()
 	waitForMiningState(t, miner, true)
 
 	miner.Stop()
@@ -160,56 +172,60 @@ func TestMinerStartStopAfterDownloaderEvents(t *testing.T) {
 }
 
 func TestStartWhileDownload(t *testing.T) {
-	miner, mux := createMiner(t)
+	miner, mux, cleanup := createMiner(t)
+	defer cleanup(false)
 	waitForMiningState(t, miner, false)
-	miner.Start(common.HexToAddress("0x12345"))
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Stop the downloader and wait for the update loop to run
 	mux.Post(downloader.StartEvent{})
 	waitForMiningState(t, miner, false)
 	// Starting the miner after the downloader should not work
-	miner.Start(common.HexToAddress("0x12345"))
+	miner.Start()
 	waitForMiningState(t, miner, false)
 }
 
 func TestStartStopMiner(t *testing.T) {
-	miner, _ := createMiner(t)
+	miner, _, cleanup := createMiner(t)
+	defer cleanup(false)
 	waitForMiningState(t, miner, false)
-	miner.Start(common.HexToAddress("0x12345"))
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	miner.Stop()
 	waitForMiningState(t, miner, false)
 }
 
 func TestCloseMiner(t *testing.T) {
-	miner, _ := createMiner(t)
+	miner, _, cleanup := createMiner(t)
+	defer cleanup(true)
 	waitForMiningState(t, miner, false)
-	miner.Start(common.HexToAddress("0x12345"))
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Terminate the miner and wait for the update loop to run
 	miner.Close()
 	waitForMiningState(t, miner, false)
 }
 
-// TestMinerSetPopcatbase checks that popcatbase becomes set even if mining isn't
+// TestMinerSetEtherbase checks that etherbase becomes set even if mining isn't
 // possible at the moment
-func TestMinerSetPopcatbase(t *testing.T) {
-	miner, mux := createMiner(t)
-	// Start with a 'bad' mining address
-	miner.Start(common.HexToAddress("0xdead"))
+func TestMinerSetEtherbase(t *testing.T) {
+	miner, mux, cleanup := createMiner(t)
+	defer cleanup(false)
+	miner.Start()
 	waitForMiningState(t, miner, true)
 	// Start the downloader
 	mux.Post(downloader.StartEvent{})
 	waitForMiningState(t, miner, false)
 	// Now user tries to configure proper mining address
-	miner.Start(common.HexToAddress("0x1337"))
+	miner.Start()
 	// Stop the downloader and wait for the update loop to run
 	mux.Post(downloader.DoneEvent{})
-
 	waitForMiningState(t, miner, true)
-	// The miner should now be using the good address
-	if got, exp := miner.coinbase, common.HexToAddress("0x1337"); got != exp {
-		t.Fatalf("Wrong coinbase, got %x expected %x", got, exp)
+
+	coinbase := common.HexToAddress("0xdeedbeef")
+	miner.SetEtherbase(coinbase)
+	if addr := miner.worker.etherbase(); addr != coinbase {
+		t.Fatalf("Unexpected etherbase want %x got %x", coinbase, addr)
 	}
 }
 
@@ -229,33 +245,41 @@ func waitForMiningState(t *testing.T, m *Miner, mining bool) {
 	t.Fatalf("Mining() == %t, want %t", state, mining)
 }
 
-func createMiner(t *testing.T) (*Miner, *event.TypeMux) {
+func createMiner(t *testing.T) (*Miner, *event.TypeMux, func(skipMiner bool)) {
 	// Create Ethash config
 	config := Config{
-		Popcatbase: common.HexToAddress("123456789"),
+		Etherbase: common.HexToAddress("123456789"),
 	}
 	// Create chainConfig
-	memdb := memorydb.New()
-	chainDB := rawdb.NewDatabase(memdb)
-	genesis := core.DeveloperGenesisBlock(15, common.HexToAddress("12345"))
-	chainConfig, _, err := core.SetupGenesisBlock(chainDB, genesis)
+	chainDB := rawdb.NewMemoryDatabase()
+	genesis := core.DeveloperGenesisBlock(15, 11_500_000, common.HexToAddress("12345"))
+	chainConfig, _, err := core.SetupGenesisBlock(chainDB, trie.NewDatabase(chainDB), genesis)
 	if err != nil {
 		t.Fatalf("can't create new chain config: %v", err)
 	}
 	// Create consensus engine
 	engine := clique.New(chainConfig.Clique, chainDB)
-	// Create Popcateum backend
-	bc, err := core.NewBlockChain(chainDB, nil, chainConfig, engine, vm.Config{}, nil, nil)
+	// Create Ethereum backend
+	bc, err := core.NewBlockChain(chainDB, nil, genesis, nil, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		t.Fatalf("can't create new chain %v", err)
 	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(chainDB), nil)
 	blockchain := &testBlockChain{statedb, 10000000, new(event.Feed)}
 
-	pool := core.NewTxPool(testTxPoolConfig, chainConfig, blockchain)
+	pool := txpool.NewTxPool(testTxPoolConfig, chainConfig, blockchain)
 	backend := NewMockBackend(bc, pool)
 	// Create event Mux
 	mux := new(event.TypeMux)
 	// Create Miner
-	return New(backend, &config, chainConfig, mux, engine, nil), mux
+	miner := New(backend, &config, chainConfig, mux, engine, nil)
+	cleanup := func(skipMiner bool) {
+		bc.Stop()
+		engine.Close()
+		pool.Stop()
+		if !skipMiner {
+			miner.Close()
+		}
+	}
+	return miner, mux, cleanup
 }

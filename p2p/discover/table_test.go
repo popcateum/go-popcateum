@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package discover
 
@@ -394,6 +394,59 @@ func TestTable_revalidateSyncRecord(t *testing.T) {
 	if !reflect.DeepEqual(intable, n2) {
 		t.Fatalf("table contains old record with seq %d, want seq %d", intable.Seq(), n2.Seq())
 	}
+}
+
+func TestNodesPush(t *testing.T) {
+	var target enode.ID
+	n1 := nodeAtDistance(target, 255, intIP(1))
+	n2 := nodeAtDistance(target, 254, intIP(2))
+	n3 := nodeAtDistance(target, 253, intIP(3))
+	perm := [][]*node{
+		{n3, n2, n1},
+		{n3, n1, n2},
+		{n2, n3, n1},
+		{n2, n1, n3},
+		{n1, n3, n2},
+		{n1, n2, n3},
+	}
+
+	// Insert all permutations into lists with size limit 3.
+	for _, nodes := range perm {
+		list := nodesByDistance{target: target}
+		for _, n := range nodes {
+			list.push(n, 3)
+		}
+		if !slicesEqual(list.entries, perm[0], nodeIDEqual) {
+			t.Fatal("not equal")
+		}
+	}
+
+	// Insert all permutations into lists with size limit 2.
+	for _, nodes := range perm {
+		list := nodesByDistance{target: target}
+		for _, n := range nodes {
+			list.push(n, 2)
+		}
+		if !slicesEqual(list.entries, perm[0][:2], nodeIDEqual) {
+			t.Fatal("not equal")
+		}
+	}
+}
+
+func nodeIDEqual(n1, n2 *node) bool {
+	return n1.ID() == n2.ID()
+}
+
+func slicesEqual[T any](s1, s2 []T, check func(e1, e2 T) bool) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i := range s1 {
+		if !check(s1[i], s2[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // gen wraps quick.Value so it's easier to use.

@@ -1,24 +1,25 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package les implements the Light Popcateum Subprotocol.
+// Package les implements the Light Ethereum Subprotocol.
 package les
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/popcateum/go-popcateum/accounts"
@@ -30,12 +31,12 @@ import (
 	"github.com/popcateum/go-popcateum/core/bloombits"
 	"github.com/popcateum/go-popcateum/core/rawdb"
 	"github.com/popcateum/go-popcateum/core/types"
-	"github.com/popcateum/go-popcateum/eth/downloader"
 	"github.com/popcateum/go-popcateum/eth/ethconfig"
-	"github.com/popcateum/go-popcateum/eth/filters"
 	"github.com/popcateum/go-popcateum/eth/gasprice"
 	"github.com/popcateum/go-popcateum/event"
 	"github.com/popcateum/go-popcateum/internal/ethapi"
+	"github.com/popcateum/go-popcateum/internal/shutdowncheck"
+	"github.com/popcateum/go-popcateum/les/downloader"
 	"github.com/popcateum/go-popcateum/les/vflux"
 	vfc "github.com/popcateum/go-popcateum/les/vflux/client"
 	"github.com/popcateum/go-popcateum/light"
@@ -47,9 +48,10 @@ import (
 	"github.com/popcateum/go-popcateum/params"
 	"github.com/popcateum/go-popcateum/rlp"
 	"github.com/popcateum/go-popcateum/rpc"
+	"github.com/popcateum/go-popcateum/trie"
 )
 
-type LightPopcateum struct {
+type LightEthereum struct {
 	lesCommons
 
 	peers              *serverPeerSet
@@ -63,6 +65,7 @@ type LightPopcateum struct {
 	serverPool         *vfc.ServerPool
 	serverPoolIterator enode.Iterator
 	pruner             *pruner
+	merger             *consensus.Merger
 
 	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	bloomIndexer  *core.ChainIndexer             // Bloom indexer operating during block imports
@@ -71,15 +74,17 @@ type LightPopcateum struct {
 	eventMux       *event.TypeMux
 	engine         consensus.Engine
 	accountManager *accounts.Manager
-	netRPCService  *ethapi.PublicNetAPI
+	netRPCService  *ethapi.NetAPI
 
 	p2pServer  *p2p.Server
 	p2pConfig  *p2p.Config
 	udpEnabled bool
+
+	shutdownTracker *shutdowncheck.ShutdownTracker // Tracks if and when the node has shutdown ungracefully
 }
 
 // New creates an instance of the light client.
-func New(stack *node.Node, config *ethconfig.Config) (*LightPopcateum, error) {
+func New(stack *node.Node, config *ethconfig.Config) (*LightEthereum, error) {
 	chainDb, err := stack.OpenDatabase("lightchaindata", config.DatabaseCache, config.DatabaseHandles, "eth/db/chaindata/", false)
 	if err != nil {
 		return nil, err
@@ -88,14 +93,25 @@ func New(stack *node.Node, config *ethconfig.Config) (*LightPopcateum, error) {
 	if err != nil {
 		return nil, err
 	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.OverrideBerlin)
+	var overrides core.ChainOverrides
+	if config.OverrideShanghai != nil {
+		overrides.OverrideShanghai = config.OverrideShanghai
+	}
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, trie.NewDatabase(chainDb), config.Genesis, &overrides)
 	if _, isCompat := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !isCompat {
 		return nil, genesisErr
 	}
-	log.Info("Initialised chain configuration", "config", chainConfig)
+	log.Info("")
+	log.Info(strings.Repeat("-", 153))
+	for _, line := range strings.Split(chainConfig.Description(), "\n") {
+		log.Info(line)
+	}
+	log.Info(strings.Repeat("-", 153))
+	log.Info("")
 
 	peers := newServerPeerSet()
-	leth := &LightPopcateum{
+	merger := consensus.NewMerger(chainDb)
+	leth := &LightEthereum{
 		lesCommons: lesCommons{
 			genesis:     genesisHash,
 			config:      config,
@@ -105,16 +121,18 @@ func New(stack *node.Node, config *ethconfig.Config) (*LightPopcateum, error) {
 			lesDb:       lesDb,
 			closeCh:     make(chan struct{}),
 		},
-		peers:          peers,
-		eventMux:       stack.EventMux(),
-		reqDist:        newRequestDistributor(peers, &mclock.System{}),
-		accountManager: stack.AccountManager(),
-		engine:         ethconfig.CreateConsensusEngine(stack, chainConfig, &config.Ethash, nil, false, chainDb),
-		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   core.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations),
-		p2pServer:      stack.Server(),
-		p2pConfig:      &stack.Config().P2P,
-		udpEnabled:     stack.Config().P2P.DiscoveryV5,
+		peers:           peers,
+		eventMux:        stack.EventMux(),
+		reqDist:         newRequestDistributor(peers, &mclock.System{}),
+		accountManager:  stack.AccountManager(),
+		merger:          merger,
+		engine:          ethconfig.CreateConsensusEngine(stack, &config.Ethash, chainConfig.Clique, nil, false, chainDb),
+		bloomRequests:   make(chan chan *bloombits.Retrieval),
+		bloomIndexer:    core.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations),
+		p2pServer:       stack.Server(),
+		p2pConfig:       &stack.Config().P2P,
+		udpEnabled:      stack.Config().P2P.DiscoveryV5,
+		shutdownTracker: shutdowncheck.NewShutdownTracker(chainDb),
 	}
 
 	var prenegQuery vfc.QueryFunc
@@ -158,7 +176,11 @@ func New(stack *node.Node, config *ethconfig.Config) (*LightPopcateum, error) {
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		leth.blockchain.SetHead(compat.RewindTo)
+		if compat.RewindToTime > 0 {
+			leth.blockchain.SetHeadWithTimestamp(compat.RewindToTime)
+		} else {
+			leth.blockchain.SetHead(compat.RewindToBlock)
+		}
 		rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
 	}
 
@@ -175,31 +197,21 @@ func New(stack *node.Node, config *ethconfig.Config) (*LightPopcateum, error) {
 		leth.blockchain.DisableCheckFreq()
 	}
 
-	leth.netRPCService = ethapi.NewPublicNetAPI(leth.p2pServer, leth.config.NetworkId)
+	leth.netRPCService = ethapi.NewNetAPI(leth.p2pServer, leth.config.NetworkId)
 
 	// Register the backend on the node
 	stack.RegisterAPIs(leth.APIs())
 	stack.RegisterProtocols(leth.Protocols())
 	stack.RegisterLifecycle(leth)
 
-	// Check for unclean shutdown
-	if uncleanShutdowns, discards, err := rawdb.PushUncleanShutdownMarker(chainDb); err != nil {
-		log.Error("Could not update unclean-shutdown-marker list", "error", err)
-	} else {
-		if discards > 0 {
-			log.Warn("Old unclean shutdowns found", "count", discards)
-		}
-		for _, tstamp := range uncleanShutdowns {
-			t := time.Unix(int64(tstamp), 0)
-			log.Warn("Unclean shutdown detected", "booted", t,
-				"age", common.PrettyAge(t))
-		}
-	}
+	// Successful startup; push a marker and check previous unclean shutdowns.
+	leth.shutdownTracker.MarkStartup()
+
 	return leth, nil
 }
 
 // VfluxRequest sends a batch of requests to the given node through discv5 UDP TalkRequest and returns the responses
-func (s *LightPopcateum) VfluxRequest(n *enode.Node, reqs vflux.Requests) vflux.Replies {
+func (s *LightEthereum) VfluxRequest(n *enode.Node, reqs vflux.Requests) vflux.Replies {
 	if !s.udpEnabled {
 		return nil
 	}
@@ -214,7 +226,7 @@ func (s *LightPopcateum) VfluxRequest(n *enode.Node, reqs vflux.Requests) vflux.
 
 // vfxVersion returns the version number of the "les" service subdomain of the vflux UDP
 // service, as advertised in the ENR record
-func (s *LightPopcateum) vfxVersion(n *enode.Node) uint {
+func (s *LightEthereum) vfxVersion(n *enode.Node) uint {
 	if n.Seq() == 0 {
 		var err error
 		if !s.udpEnabled {
@@ -238,7 +250,7 @@ func (s *LightPopcateum) vfxVersion(n *enode.Node) uint {
 
 // prenegQuery sends a capacity query to the given server node to determine whether
 // a connection slot is immediately available
-func (s *LightPopcateum) prenegQuery(n *enode.Node) int {
+func (s *LightEthereum) prenegQuery(n *enode.Node) int {
 	if s.vfxVersion(n) < 1 {
 		// UDP query not supported, always try TCP connection
 		return 1
@@ -262,12 +274,12 @@ func (s *LightPopcateum) prenegQuery(n *enode.Node) int {
 
 type LightDummyAPI struct{}
 
-// Popcatbase is the address that mining rewards will be send to
-func (s *LightDummyAPI) Popcatbase() (common.Address, error) {
+// Etherbase is the address that mining rewards will be send to
+func (s *LightDummyAPI) Etherbase() (common.Address, error) {
 	return common.Address{}, fmt.Errorf("mining is not supported in light mode")
 }
 
-// Coinbase is the address that mining rewards will be send to (alias for Popcatbase)
+// Coinbase is the address that mining rewards will be send to (alias for Etherbase)
 func (s *LightDummyAPI) Coinbase() (common.Address, error) {
 	return common.Address{}, fmt.Errorf("mining is not supported in light mode")
 }
@@ -282,59 +294,45 @@ func (s *LightDummyAPI) Mining() bool {
 	return false
 }
 
-// APIs returns the collection of RPC services the popcateum package offers.
+// APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
-func (s *LightPopcateum) APIs() []rpc.API {
+func (s *LightEthereum) APIs() []rpc.API {
 	apis := ethapi.GetAPIs(s.ApiBackend)
 	apis = append(apis, s.engine.APIs(s.BlockChain().HeaderChain())...)
 	return append(apis, []rpc.API{
 		{
 			Namespace: "eth",
-			Version:   "1.0",
 			Service:   &LightDummyAPI{},
-			Public:    true,
 		}, {
 			Namespace: "eth",
-			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.handler.downloader, s.eventMux),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend, true, 5*time.Minute),
-			Public:    true,
+			Service:   downloader.NewDownloaderAPI(s.handler.downloader, s.eventMux),
 		}, {
 			Namespace: "net",
-			Version:   "1.0",
 			Service:   s.netRPCService,
-			Public:    true,
 		}, {
 			Namespace: "les",
-			Version:   "1.0",
-			Service:   NewPrivateLightAPI(&s.lesCommons),
-			Public:    false,
+			Service:   NewLightAPI(&s.lesCommons),
 		}, {
 			Namespace: "vflux",
-			Version:   "1.0",
 			Service:   s.serverPool.API(),
-			Public:    false,
 		},
 	}...)
 }
 
-func (s *LightPopcateum) ResetWithGenesisBlock(gb *types.Block) {
+func (s *LightEthereum) ResetWithGenesisBlock(gb *types.Block) {
 	s.blockchain.ResetWithGenesisBlock(gb)
 }
 
-func (s *LightPopcateum) BlockChain() *light.LightChain      { return s.blockchain }
-func (s *LightPopcateum) TxPool() *light.TxPool              { return s.txPool }
-func (s *LightPopcateum) Engine() consensus.Engine           { return s.engine }
-func (s *LightPopcateum) LesVersion() int                    { return int(ClientProtocolVersions[0]) }
-func (s *LightPopcateum) Downloader() *downloader.Downloader { return s.handler.downloader }
-func (s *LightPopcateum) EventMux() *event.TypeMux           { return s.eventMux }
+func (s *LightEthereum) BlockChain() *light.LightChain      { return s.blockchain }
+func (s *LightEthereum) TxPool() *light.TxPool              { return s.txPool }
+func (s *LightEthereum) Engine() consensus.Engine           { return s.engine }
+func (s *LightEthereum) LesVersion() int                    { return int(ClientProtocolVersions[0]) }
+func (s *LightEthereum) Downloader() *downloader.Downloader { return s.handler.downloader }
+func (s *LightEthereum) EventMux() *event.TypeMux           { return s.eventMux }
+func (s *LightEthereum) Merger() *consensus.Merger          { return s.merger }
 
 // Protocols returns all the currently configured network protocols to start.
-func (s *LightPopcateum) Protocols() []p2p.Protocol {
+func (s *LightEthereum) Protocols() []p2p.Protocol {
 	return s.makeProtocols(ClientProtocolVersions, s.handler.runPeer, func(id enode.ID) interface{} {
 		if p := s.peers.peer(id.String()); p != nil {
 			return p.Info()
@@ -344,9 +342,12 @@ func (s *LightPopcateum) Protocols() []p2p.Protocol {
 }
 
 // Start implements node.Lifecycle, starting all internal goroutines needed by the
-// light popcateum protocol implementation.
-func (s *LightPopcateum) Start() error {
+// light ethereum protocol implementation.
+func (s *LightEthereum) Start() error {
 	log.Warn("Light client mode is an experimental feature")
+
+	// Regularly update shutdown marker
+	s.shutdownTracker.Start()
 
 	if s.udpEnabled && s.p2pServer.DiscV5 == nil {
 		s.udpEnabled = false
@@ -367,8 +368,8 @@ func (s *LightPopcateum) Start() error {
 }
 
 // Stop implements node.Lifecycle, terminating all internal goroutines used by the
-// Popcateum protocol.
-func (s *LightPopcateum) Stop() error {
+// Ethereum protocol.
+func (s *LightEthereum) Stop() error {
 	close(s.closeCh)
 	s.serverPool.Stop()
 	s.peers.close()
@@ -383,10 +384,12 @@ func (s *LightPopcateum) Stop() error {
 	s.engine.Close()
 	s.pruner.close()
 	s.eventMux.Stop()
-	rawdb.PopUncleanShutdownMarker(s.chainDb)
+	// Clean shutdown marker as the last thing before closing db
+	s.shutdownTracker.Stop()
+
 	s.chainDb.Close()
 	s.lesDb.Close()
 	s.wg.Wait()
-	log.Info("Light popcateum stopped")
+	log.Info("Light ethereum stopped")
 	return nil
 }

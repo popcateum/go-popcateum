@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package log
 
@@ -82,14 +82,14 @@ func (h *GlogHandler) Verbosity(level Lvl) {
 //
 // For instance:
 //
-//  pattern="gopher.go=3"
-//   sets the V level to 3 in all Go files named "gopher.go"
+//	pattern="gopher.go=3"
+//	 sets the V level to 3 in all Go files named "gopher.go"
 //
-//  pattern="foo=3"
-//   sets V to 3 in all files of any packages whose import path ends in "foo"
+//	pattern="foo=3"
+//	 sets V to 3 in all files of any packages whose import path ends in "foo"
 //
-//  pattern="foo/*=3"
-//   sets V to 3 in all files of any packages whose import path contains "foo"
+//	pattern="foo/*=3"
+//	 sets V to 3 in all files of any packages whose import path contains "foo"
 func (h *GlogHandler) Vmodule(ruleset string) error {
 	var filter []pattern
 	for _, rule := range strings.Split(ruleset, ",") {

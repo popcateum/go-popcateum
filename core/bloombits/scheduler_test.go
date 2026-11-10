@@ -1,29 +1,27 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bloombits
 
 import (
 	"bytes"
 	"math/big"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 // Tests that the scheduler can deduplicate and forward retrieval requests to
@@ -47,14 +45,13 @@ func testScheduler(t *testing.T, clients int, fetchers int, requests int) {
 	fetch := make(chan *request, 16)
 	defer close(fetch)
 
-	var delivered uint32
+	var delivered atomic.Uint32
 	for i := 0; i < fetchers; i++ {
 		go func() {
 			defer fetchPend.Done()
 
 			for req := range fetch {
-				time.Sleep(time.Duration(rand.Intn(int(100 * time.Microsecond))))
-				atomic.AddUint32(&delivered, 1)
+				delivered.Add(1)
 
 				f.deliver([]uint64{
 					req.section + uint64(requests), // Non-requested data (ensure it doesn't go out of bounds)
@@ -100,7 +97,7 @@ func testScheduler(t *testing.T, clients int, fetchers int, requests int) {
 	}
 	pend.Wait()
 
-	if have := atomic.LoadUint32(&delivered); int(have) != requests {
+	if have := delivered.Load(); int(have) != requests {
 		t.Errorf("request count mismatch: have %v, want %v", have, requests)
 	}
 }

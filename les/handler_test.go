@@ -1,18 +1,18 @@
-// Copyright 2016 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2016 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -28,9 +28,10 @@ import (
 	"github.com/popcateum/go-popcateum/consensus/ethash"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/crypto"
-	"github.com/popcateum/go-popcateum/eth/downloader"
+	"github.com/popcateum/go-popcateum/les/downloader"
 	"github.com/popcateum/go-popcateum/light"
 	"github.com/popcateum/go-popcateum/p2p"
 	"github.com/popcateum/go-popcateum/params"
@@ -120,20 +121,20 @@ func testGetBlockHeaders(t *testing.T, protocol int) {
 			&GetBlockHeadersData{Origin: hashOrNumber{Number: 0}, Amount: 1},
 			[]common.Hash{bc.GetBlockByNumber(0).Hash()},
 		}, {
-			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().NumberU64()}, Amount: 1},
+			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().Number.Uint64()}, Amount: 1},
 			[]common.Hash{bc.CurrentBlock().Hash()},
 		},
 		// Ensure protocol limits are honored
 		//{
-		//	&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().NumberU64() - 1}, Amount: limit + 10, Reverse: true},
+		//	&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().Number.Uint64()() - 1}, Amount: limit + 10, Reverse: true},
 		//	[]common.Hash{},
 		//},
 		// Check that requesting more than available is handled gracefully
 		{
-			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().NumberU64() - 4}, Skip: 3, Amount: 3},
+			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().Number.Uint64() - 4}, Skip: 3, Amount: 3},
 			[]common.Hash{
-				bc.GetBlockByNumber(bc.CurrentBlock().NumberU64() - 4).Hash(),
-				bc.GetBlockByNumber(bc.CurrentBlock().NumberU64()).Hash(),
+				bc.GetBlockByNumber(bc.CurrentBlock().Number.Uint64() - 4).Hash(),
+				bc.GetBlockByNumber(bc.CurrentBlock().Number.Uint64()).Hash(),
 			},
 		}, {
 			&GetBlockHeadersData{Origin: hashOrNumber{Number: 4}, Skip: 3, Amount: 3, Reverse: true},
@@ -144,10 +145,10 @@ func testGetBlockHeaders(t *testing.T, protocol int) {
 		},
 		// Check that requesting more than available is handled gracefully, even if mid skip
 		{
-			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().NumberU64() - 4}, Skip: 2, Amount: 3},
+			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().Number.Uint64() - 4}, Skip: 2, Amount: 3},
 			[]common.Hash{
-				bc.GetBlockByNumber(bc.CurrentBlock().NumberU64() - 4).Hash(),
-				bc.GetBlockByNumber(bc.CurrentBlock().NumberU64() - 1).Hash(),
+				bc.GetBlockByNumber(bc.CurrentBlock().Number.Uint64() - 4).Hash(),
+				bc.GetBlockByNumber(bc.CurrentBlock().Number.Uint64() - 1).Hash(),
 			},
 		}, {
 			&GetBlockHeadersData{Origin: hashOrNumber{Number: 4}, Skip: 2, Amount: 3, Reverse: true},
@@ -161,7 +162,7 @@ func testGetBlockHeaders(t *testing.T, protocol int) {
 			&GetBlockHeadersData{Origin: hashOrNumber{Hash: unknown}, Amount: 1},
 			[]common.Hash{},
 		}, {
-			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().NumberU64() + 1}, Amount: 1},
+			&GetBlockHeadersData{Origin: hashOrNumber{Number: bc.CurrentBlock().Number.Uint64() + 1}, Amount: 1},
 			[]common.Hash{},
 		},
 	}
@@ -239,7 +240,7 @@ func testGetBlockBodies(t *testing.T, protocol int) {
 
 		for j := 0; j < tt.random; j++ {
 			for {
-				num := rand.Int63n(int64(bc.CurrentBlock().NumberU64()))
+				num := rand.Int63n(int64(bc.CurrentBlock().Number.Uint64()))
 				if !seen[num] {
 					seen[num] = true
 
@@ -291,7 +292,7 @@ func testGetCode(t *testing.T, protocol int) {
 
 	var codereqs []*CodeReq
 	var codes [][]byte
-	for i := uint64(0); i <= bc.CurrentBlock().NumberU64(); i++ {
+	for i := uint64(0); i <= bc.CurrentBlock().Number.Uint64(); i++ {
 		header := bc.GetHeaderByNumber(i)
 		req := &CodeReq{
 			BHash:  header.Hash(),
@@ -366,11 +367,11 @@ func testGetReceipt(t *testing.T, protocol int) {
 	// Collect the hashes to request, and the response to expect
 	var receipts []types.Receipts
 	var hashes []common.Hash
-	for i := uint64(0); i <= bc.CurrentBlock().NumberU64(); i++ {
+	for i := uint64(0); i <= bc.CurrentBlock().Number.Uint64(); i++ {
 		block := bc.GetBlockByNumber(i)
 
 		hashes = append(hashes, block.Hash())
-		receipts = append(receipts, rawdb.ReadRawReceipts(server.db, block.Hash(), block.NumberU64()))
+		receipts = append(receipts, rawdb.ReadReceipts(server.db, block.Hash(), block.NumberU64(), bc.Config()))
 	}
 	// Send the hash request and verify the response
 	sendRequest(rawPeer.app, GetReceiptsMsg, 42, hashes)
@@ -403,9 +404,9 @@ func testGetProofs(t *testing.T, protocol int) {
 	proofsV2 := light.NewNodeSet()
 
 	accounts := []common.Address{bankAddr, userAddr1, userAddr2, signerAddr, {}}
-	for i := uint64(0); i <= bc.CurrentBlock().NumberU64(); i++ {
+	for i := uint64(0); i <= bc.CurrentBlock().Number.Uint64(); i++ {
 		header := bc.GetHeaderByNumber(i)
-		trie, _ := trie.New(header.Root, trie.NewDatabase(server.db))
+		trie, _ := trie.New(trie.StateTrieID(header.Root), trie.NewDatabase(server.db))
 
 		for _, acc := range accounts {
 			req := ProofReq{
@@ -456,7 +457,7 @@ func testGetStaleProof(t *testing.T, protocol int) {
 		var expected []rlp.RawValue
 		if wantOK {
 			proofsV2 := light.NewNodeSet()
-			t, _ := trie.New(header.Root, trie.NewDatabase(server.db))
+			t, _ := trie.New(trie.StateTrieID(header.Root), trie.NewDatabase(server.db))
 			t.Prove(account, 0, proofsV2)
 			expected = proofsV2.NodeList()
 		}
@@ -512,7 +513,7 @@ func testGetCHTProofs(t *testing.T, protocol int) {
 		AuxData: [][]byte{rlp},
 	}
 	root := light.GetChtRoot(server.db, 0, bc.GetHeaderByNumber(config.ChtSize-1).Hash())
-	trie, _ := trie.New(root, trie.NewDatabase(rawdb.NewTable(server.db, light.ChtTablePrefix)))
+	trie, _ := trie.New(trie.TrieID(root), trie.NewDatabase(rawdb.NewTable(server.db, string(rawdb.ChtTablePrefix))))
 	trie.Prove(key, 0, &proofsV2.Proofs)
 	// Assemble the requests for the different protocols
 	requestsV2 := []HelperTrieReq{{
@@ -577,7 +578,7 @@ func testGetBloombitsProofs(t *testing.T, protocol int) {
 		var proofs HelperTrieResps
 
 		root := light.GetBloomTrieRoot(server.db, 0, bc.GetHeaderByNumber(config.BloomTrieSize-1).Hash())
-		trie, _ := trie.New(root, trie.NewDatabase(rawdb.NewTable(server.db, light.BloomTrieTablePrefix)))
+		trie, _ := trie.New(trie.TrieID(root), trie.NewDatabase(rawdb.NewTable(server.db, string(rawdb.BloomTrieTablePrefix))))
 		trie.Prove(key, 0, &proofs.Proofs)
 
 		// Send the proof request and verify the response
@@ -624,20 +625,20 @@ func testTransactionStatus(t *testing.T, protocol int) {
 
 	// test error status by sending an underpriced transaction
 	tx0, _ := types.SignTx(types.NewTransaction(0, userAddr1, big.NewInt(10000), params.TxGas, nil, nil), signer, bankKey)
-	test(tx0, true, light.TxStatus{Status: core.TxStatusUnknown, Error: core.ErrUnderpriced.Error()})
+	test(tx0, true, light.TxStatus{Status: txpool.TxStatusUnknown, Error: txpool.ErrUnderpriced.Error()})
 
 	tx1, _ := types.SignTx(types.NewTransaction(0, userAddr1, big.NewInt(10000), params.TxGas, big.NewInt(100000000000), nil), signer, bankKey)
-	test(tx1, false, light.TxStatus{Status: core.TxStatusUnknown}) // query before sending, should be unknown
-	test(tx1, true, light.TxStatus{Status: core.TxStatusPending})  // send valid processable tx, should return pending
-	test(tx1, true, light.TxStatus{Status: core.TxStatusPending})  // adding it again should not return an error
+	test(tx1, false, light.TxStatus{Status: txpool.TxStatusUnknown}) // query before sending, should be unknown
+	test(tx1, true, light.TxStatus{Status: txpool.TxStatusPending})  // send valid processable tx, should return pending
+	test(tx1, true, light.TxStatus{Status: txpool.TxStatusPending})  // adding it again should not return an error
 
 	tx2, _ := types.SignTx(types.NewTransaction(1, userAddr1, big.NewInt(10000), params.TxGas, big.NewInt(100000000000), nil), signer, bankKey)
 	tx3, _ := types.SignTx(types.NewTransaction(2, userAddr1, big.NewInt(10000), params.TxGas, big.NewInt(100000000000), nil), signer, bankKey)
 	// send transactions in the wrong order, tx3 should be queued
-	test(tx3, true, light.TxStatus{Status: core.TxStatusQueued})
-	test(tx2, true, light.TxStatus{Status: core.TxStatusPending})
+	test(tx3, true, light.TxStatus{Status: txpool.TxStatusQueued})
+	test(tx2, true, light.TxStatus{Status: txpool.TxStatusPending})
 	// query again, now tx3 should be pending too
-	test(tx3, false, light.TxStatus{Status: core.TxStatusPending})
+	test(tx3, false, light.TxStatus{Status: txpool.TxStatusPending})
 
 	// generate and add a block with tx1 and tx2 included
 	gchain, _ := core.GenerateChain(params.TestChainConfig, chain.GetBlockByNumber(0), ethash.NewFaker(), server.db, 1, func(i int, block *core.BlockGen) {
@@ -663,9 +664,9 @@ func testTransactionStatus(t *testing.T, protocol int) {
 
 	// check if their status is included now
 	block1hash := rawdb.ReadCanonicalHash(server.db, 1)
-	test(tx1, false, light.TxStatus{Status: core.TxStatusIncluded, Lookup: &rawdb.LegacyTxLookupEntry{BlockHash: block1hash, BlockIndex: 1, Index: 0}})
+	test(tx1, false, light.TxStatus{Status: txpool.TxStatusIncluded, Lookup: &rawdb.LegacyTxLookupEntry{BlockHash: block1hash, BlockIndex: 1, Index: 0}})
 
-	test(tx2, false, light.TxStatus{Status: core.TxStatusIncluded, Lookup: &rawdb.LegacyTxLookupEntry{BlockHash: block1hash, BlockIndex: 1, Index: 1}})
+	test(tx2, false, light.TxStatus{Status: txpool.TxStatusIncluded, Lookup: &rawdb.LegacyTxLookupEntry{BlockHash: block1hash, BlockIndex: 1, Index: 1}})
 
 	// create a reorg that rolls them back
 	gchain, _ = core.GenerateChain(params.TestChainConfig, chain.GetBlockByNumber(0), ethash.NewFaker(), server.db, 2, func(i int, block *core.BlockGen) {})
@@ -687,8 +688,8 @@ func testTransactionStatus(t *testing.T, protocol int) {
 	msg.Discard()
 
 	// check if their status is pending again
-	test(tx1, false, light.TxStatus{Status: core.TxStatusPending})
-	test(tx2, false, light.TxStatus{Status: core.TxStatusPending})
+	test(tx1, false, light.TxStatus{Status: txpool.TxStatusPending})
+	test(tx2, false, light.TxStatus{Status: txpool.TxStatusPending})
 }
 
 func TestStopResumeLES3(t *testing.T) { testStopResume(t, lpv3) }

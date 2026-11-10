@@ -1,24 +1,26 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
 
 import (
+	"bytes"
 	"math"
 	"math/big"
+	"sort"
 	"testing"
 
 	"github.com/popcateum/go-popcateum/common"
@@ -102,6 +104,76 @@ func TestEIP2200(t *testing.T) {
 		}
 		if refund := vmenv.StateDB.GetRefund(); refund != tt.refund {
 			t.Errorf("test %d: gas refund mismatch: have %v, want %v", i, refund, tt.refund)
+		}
+	}
+}
+
+var createGasTests = []struct {
+	code       string
+	eip3860    bool
+	gasUsed    uint64
+	minimumGas uint64
+}{
+	// legacy create(0, 0, 0xc000) without 3860 used
+	{"0x61C00060006000f0" + "600052" + "60206000F3", false, 41237, 41237},
+	// legacy create(0, 0, 0xc000) _with_ 3860
+	{"0x61C00060006000f0" + "600052" + "60206000F3", true, 44309, 44309},
+	// create2(0, 0, 0xc001, 0) without 3860
+	{"0x600061C00160006000f5" + "600052" + "60206000F3", false, 50471, 50471},
+	// create2(0, 0, 0xc001, 0) (too large), with 3860
+	{"0x600061C00160006000f5" + "600052" + "60206000F3", true, 32012, 100_000},
+	// create2(0, 0, 0xc000, 0)
+	// This case is trying to deploy code at (within) the limit
+	{"0x600061C00060006000f5" + "600052" + "60206000F3", true, 53528, 53528},
+	// create2(0, 0, 0xc001, 0)
+	// This case is trying to deploy code exceeding the limit
+	{"0x600061C00160006000f5" + "600052" + "60206000F3", true, 32024, 100000},
+}
+
+func TestCreateGas(t *testing.T) {
+	for i, tt := range createGasTests {
+		var gasUsed = uint64(0)
+		doCheck := func(testGas int) bool {
+			address := common.BytesToAddress([]byte("contract"))
+			statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+			statedb.CreateAccount(address)
+			statedb.SetCode(address, hexutil.MustDecode(tt.code))
+			statedb.Finalise(true)
+			vmctx := BlockContext{
+				CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
+				Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
+				BlockNumber: big.NewInt(0),
+			}
+			config := Config{}
+			if tt.eip3860 {
+				config.ExtraEips = []int{3860}
+			}
+
+			vmenv := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, config)
+			var startGas = uint64(testGas)
+			ret, gas, err := vmenv.Call(AccountRef(common.Address{}), address, nil, startGas, new(big.Int))
+			if err != nil {
+				return false
+			}
+			gasUsed = startGas - gas
+			if len(ret) != 32 {
+				t.Fatalf("test %d: expected 32 bytes returned, have %d", i, len(ret))
+			}
+			if bytes.Equal(ret, make([]byte, 32)) {
+				// Failure
+				return false
+			}
+			return true
+		}
+		minGas := sort.Search(100_000, doCheck)
+		if uint64(minGas) != tt.minimumGas {
+			t.Fatalf("test %d: min gas error, want %d, have %d", i, tt.minimumGas, minGas)
+		}
+		// If the deployment succeeded, we also check the gas used
+		if minGas < 100_000 {
+			if gasUsed != tt.gasUsed {
+				t.Errorf("test %d: gas used mismatch: have %v, want %v", i, gasUsed, tt.gasUsed)
+			}
 		}
 	}
 }

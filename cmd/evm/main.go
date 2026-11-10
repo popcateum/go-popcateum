@@ -1,18 +1,18 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of go-popcateum.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of go-ethereum.
 //
-// go-popcateum is free software: you can redistribute it and/or modify
+// go-ethereum is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-popcateum is distributed in the hope that it will be useful,
+// go-ethereum is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-popcateum. If not, see <http://www.gnu.org/licenses/>.
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
 // evm executes EVM code snippets.
 package main
@@ -23,129 +23,122 @@ import (
 	"os"
 
 	"github.com/popcateum/go-popcateum/cmd/evm/internal/t8ntool"
-	"github.com/popcateum/go-popcateum/cmd/utils"
 	"github.com/popcateum/go-popcateum/internal/flags"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli/v2"
 )
 
-var gitCommit = "" // Git SHA1 commit hash of the release (set via linker flags)
-var gitDate = ""
-
 var (
-	app = flags.NewApp(gitCommit, gitDate, "the evm command line interface")
-
-	DebugFlag = cli.BoolFlag{
+	DebugFlag = &cli.BoolFlag{
 		Name:  "debug",
 		Usage: "output full trace logs",
 	}
-	MemProfileFlag = cli.StringFlag{
+	MemProfileFlag = &cli.StringFlag{
 		Name:  "memprofile",
 		Usage: "creates a memory profile at the given path",
 	}
-	CPUProfileFlag = cli.StringFlag{
+	CPUProfileFlag = &cli.StringFlag{
 		Name:  "cpuprofile",
 		Usage: "creates a CPU profile at the given path",
 	}
-	StatDumpFlag = cli.BoolFlag{
+	StatDumpFlag = &cli.BoolFlag{
 		Name:  "statdump",
 		Usage: "displays stack and heap memory information",
 	}
-	CodeFlag = cli.StringFlag{
+	CodeFlag = &cli.StringFlag{
 		Name:  "code",
 		Usage: "EVM code",
 	}
-	CodeFileFlag = cli.StringFlag{
+	CodeFileFlag = &cli.StringFlag{
 		Name:  "codefile",
 		Usage: "File containing EVM code. If '-' is specified, code is read from stdin ",
 	}
-	GasFlag = cli.Uint64Flag{
+	GasFlag = &cli.Uint64Flag{
 		Name:  "gas",
 		Usage: "gas limit for the evm",
 		Value: 10000000000,
 	}
-	PriceFlag = utils.BigFlag{
+	PriceFlag = &flags.BigFlag{
 		Name:  "price",
 		Usage: "price set for the evm",
 		Value: new(big.Int),
 	}
-	ValueFlag = utils.BigFlag{
+	ValueFlag = &flags.BigFlag{
 		Name:  "value",
 		Usage: "value set for the evm",
 		Value: new(big.Int),
 	}
-	DumpFlag = cli.BoolFlag{
+	DumpFlag = &cli.BoolFlag{
 		Name:  "dump",
 		Usage: "dumps the state after the run",
 	}
-	InputFlag = cli.StringFlag{
+	InputFlag = &cli.StringFlag{
 		Name:  "input",
 		Usage: "input for the EVM",
 	}
-	InputFileFlag = cli.StringFlag{
+	InputFileFlag = &cli.StringFlag{
 		Name:  "inputfile",
 		Usage: "file containing input for the EVM",
 	}
-	VerbosityFlag = cli.IntFlag{
+	VerbosityFlag = &cli.IntFlag{
 		Name:  "verbosity",
 		Usage: "sets the verbosity level",
 	}
-	BenchFlag = cli.BoolFlag{
+	BenchFlag = &cli.BoolFlag{
 		Name:  "bench",
 		Usage: "benchmark the execution",
 	}
-	CreateFlag = cli.BoolFlag{
+	CreateFlag = &cli.BoolFlag{
 		Name:  "create",
 		Usage: "indicates the action should be create rather than call",
 	}
-	GenesisFlag = cli.StringFlag{
+	GenesisFlag = &cli.StringFlag{
 		Name:  "prestate",
 		Usage: "JSON file with prestate (genesis) config",
 	}
-	MachineFlag = cli.BoolFlag{
+	MachineFlag = &cli.BoolFlag{
 		Name:  "json",
 		Usage: "output trace logs in machine readable format (json)",
 	}
-	SenderFlag = cli.StringFlag{
+	SenderFlag = &cli.StringFlag{
 		Name:  "sender",
 		Usage: "The transaction origin",
 	}
-	ReceiverFlag = cli.StringFlag{
+	ReceiverFlag = &cli.StringFlag{
 		Name:  "receiver",
 		Usage: "The transaction receiver (execution context)",
 	}
-	DisableMemoryFlag = cli.BoolFlag{
+	DisableMemoryFlag = &cli.BoolFlag{
 		Name:  "nomemory",
+		Value: true,
 		Usage: "disable memory output",
 	}
-	DisableStackFlag = cli.BoolFlag{
+	DisableStackFlag = &cli.BoolFlag{
 		Name:  "nostack",
 		Usage: "disable stack output",
 	}
-	DisableStorageFlag = cli.BoolFlag{
+	DisableStorageFlag = &cli.BoolFlag{
 		Name:  "nostorage",
 		Usage: "disable storage output",
 	}
-	DisableReturnDataFlag = cli.BoolFlag{
+	DisableReturnDataFlag = &cli.BoolFlag{
 		Name:  "noreturndata",
-		Usage: "disable return data output",
-	}
-	EVMInterpreterFlag = cli.StringFlag{
-		Name:  "vm.evm",
-		Usage: "External EVM configuration (default = built-in interpreter)",
-		Value: "",
+		Value: true,
+		Usage: "enable return data output",
 	}
 )
 
-var stateTransitionCommand = cli.Command{
+var stateTransitionCommand = &cli.Command{
 	Name:    "transition",
 	Aliases: []string{"t8n"},
 	Usage:   "executes a full state transition",
-	Action:  t8ntool.Main,
+	Action:  t8ntool.Transition,
 	Flags: []cli.Flag{
 		t8ntool.TraceFlag,
 		t8ntool.TraceDisableMemoryFlag,
+		t8ntool.TraceEnableMemoryFlag,
 		t8ntool.TraceDisableStackFlag,
 		t8ntool.TraceDisableReturnDataFlag,
+		t8ntool.TraceEnableReturnDataFlag,
 		t8ntool.OutputBasedir,
 		t8ntool.OutputAllocFlag,
 		t8ntool.OutputResultFlag,
@@ -159,6 +152,41 @@ var stateTransitionCommand = cli.Command{
 		t8ntool.VerbosityFlag,
 	},
 }
+
+var transactionCommand = &cli.Command{
+	Name:    "transaction",
+	Aliases: []string{"t9n"},
+	Usage:   "performs transaction validation",
+	Action:  t8ntool.Transaction,
+	Flags: []cli.Flag{
+		t8ntool.InputTxsFlag,
+		t8ntool.ChainIDFlag,
+		t8ntool.ForknameFlag,
+		t8ntool.VerbosityFlag,
+	},
+}
+
+var blockBuilderCommand = &cli.Command{
+	Name:    "block-builder",
+	Aliases: []string{"b11r"},
+	Usage:   "builds a block",
+	Action:  t8ntool.BuildBlock,
+	Flags: []cli.Flag{
+		t8ntool.OutputBasedir,
+		t8ntool.OutputBlockFlag,
+		t8ntool.InputHeaderFlag,
+		t8ntool.InputOmmersFlag,
+		t8ntool.InputWithdrawalsFlag,
+		t8ntool.InputTxsRlpFlag,
+		t8ntool.SealCliqueFlag,
+		t8ntool.SealEthashFlag,
+		t8ntool.SealEthashDirFlag,
+		t8ntool.SealEthashModeFlag,
+		t8ntool.VerbosityFlag,
+	},
+}
+
+var app = flags.NewApp("the evm command line interface")
 
 func init() {
 	app.Flags = []cli.Flag{
@@ -185,23 +213,24 @@ func init() {
 		DisableStackFlag,
 		DisableStorageFlag,
 		DisableReturnDataFlag,
-		EVMInterpreterFlag,
 	}
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		compileCommand,
 		disasmCommand,
 		runCommand,
+		blockTestCommand,
 		stateTestCommand,
 		stateTransitionCommand,
+		transactionCommand,
+		blockBuilderCommand,
 	}
-	cli.CommandHelpTemplate = flags.OriginCommandHelpTemplate
 }
 
 func main() {
 	if err := app.Run(os.Args); err != nil {
 		code := 1
 		if ec, ok := err.(*t8ntool.NumberedError); ok {
-			code = ec.Code()
+			code = ec.ExitCode()
 		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(code)

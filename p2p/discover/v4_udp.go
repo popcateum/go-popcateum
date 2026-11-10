@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package discover
 
@@ -34,7 +34,6 @@ import (
 	"github.com/popcateum/go-popcateum/p2p/discover/v4wire"
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/p2p/netutil"
-	"github.com/popcateum/go-popcateum/rlp"
 )
 
 // Errors
@@ -217,7 +216,7 @@ func (t *UDPv4) Ping(n *enode.Node) error {
 func (t *UDPv4) ping(n *enode.Node) (seq uint64, err error) {
 	rm := t.sendPing(n.ID(), &net.UDPAddr{IP: n.IP(), Port: n.UDP()}, nil)
 	if err = <-rm.errc; err == nil {
-		seq = rm.reply.(*v4wire.Pong).ENRSeq()
+		seq = rm.reply.(*v4wire.Pong).ENRSeq
 	}
 	return seq, err
 }
@@ -248,13 +247,12 @@ func (t *UDPv4) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) *r
 }
 
 func (t *UDPv4) makePing(toaddr *net.UDPAddr) *v4wire.Ping {
-	seq, _ := rlp.EncodeToBytes(t.localNode.Node().Seq())
 	return &v4wire.Ping{
 		Version:    4,
 		From:       t.ourEndpoint(),
 		To:         v4wire.NewEndpoint(toaddr, 0),
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
-		Rest:       []rlp.RawValue{seq},
+		ENRSeq:     t.localNode.Node().Seq(),
 	}
 }
 
@@ -330,13 +328,13 @@ func (t *UDPv4) findnode(toid enode.ID, toaddr *net.UDPAddr, target v4wire.Pubke
 	// enough nodes the reply matcher will time out waiting for the second reply, but
 	// there's no need for an error in that case.
 	err := <-rm.errc
-	if err == errTimeout && rm.reply != nil {
+	if errors.Is(err, errTimeout) && rm.reply != nil {
 		err = nil
 	}
 	return nodes, err
 }
 
-// RequestENR sends enrRequest to the given node and waits for a response.
+// RequestENR sends ENRRequest to the given node and waits for a response.
 func (t *UDPv4) RequestENR(n *enode.Node) (*enode.Node, error) {
 	addr := &net.UDPAddr{IP: n.IP(), Port: n.UDP()}
 	t.ensureBond(n.ID(), addr)
@@ -527,8 +525,8 @@ func (t *UDPv4) readLoop(unhandled chan<- ReadPacket) {
 			t.log.Debug("Temporary UDP read error", "err", err)
 			continue
 		} else if err != nil {
-			// Shut down the loop for permament errors.
-			if err != io.EOF {
+			// Shut down the loop for permanent errors.
+			if !errors.Is(err, io.EOF) {
 				t.log.Debug("UDP read error", "err", err)
 			}
 			return
@@ -585,7 +583,7 @@ func (t *UDPv4) nodeFromRPC(sender *net.UDPAddr, rn v4wire.Node) (*node, error) 
 		return nil, err
 	}
 	if t.netrestrict != nil && !t.netrestrict.Contains(rn.IP) {
-		return nil, errors.New("not contained in netrestrict whitelist")
+		return nil, errors.New("not contained in netrestrict list")
 	}
 	key, err := v4wire.DecodePubkey(crypto.S256(), rn.ID)
 	if err != nil {
@@ -660,12 +658,11 @@ func (t *UDPv4) handlePing(h *packetHandlerV4, from *net.UDPAddr, fromID enode.I
 	req := h.Packet.(*v4wire.Ping)
 
 	// Reply.
-	seq, _ := rlp.EncodeToBytes(t.localNode.Node().Seq())
 	t.send(from, fromID, &v4wire.Pong{
 		To:         v4wire.NewEndpoint(from, req.From.TCP),
 		ReplyTok:   mac,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
-		Rest:       []rlp.RawValue{seq},
+		ENRSeq:     t.localNode.Node().Seq(),
 	})
 
 	// Ping back if our last pong on file is too far in the past.

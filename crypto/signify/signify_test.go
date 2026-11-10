@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // signFile reads the contents of an input file and signs it (in armored format)
 // with the key provided, placing the signature into the output file.
@@ -20,11 +20,9 @@
 package signify
 
 import (
-	"io/ioutil"
-	"math/rand"
+	"crypto/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/jedisct1/go-minisign"
 )
@@ -35,14 +33,12 @@ var (
 )
 
 func TestSignify(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "")
+	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-
-	rand.Seed(time.Now().UnixNano())
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -79,14 +75,12 @@ func TestSignify(t *testing.T) {
 }
 
 func TestSignifyTrustedCommentTooManyLines(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "")
+	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-
-	rand.Seed(time.Now().UnixNano())
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -104,14 +98,12 @@ func TestSignifyTrustedCommentTooManyLines(t *testing.T) {
 }
 
 func TestSignifyTrustedCommentTooManyLinesLF(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "")
+	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-
-	rand.Seed(time.Now().UnixNano())
 
 	data := make([]byte, 1024)
 	rand.Read(data)
@@ -129,14 +121,12 @@ func TestSignifyTrustedCommentTooManyLinesLF(t *testing.T) {
 }
 
 func TestSignifyTrustedCommentEmpty(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "")
+	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-
-	rand.Seed(time.Now().UnixNano())
 
 	data := make([]byte, 1024)
 	rand.Read(data)

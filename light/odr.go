@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package light
 
@@ -24,6 +24,7 @@ import (
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/ethdb"
 )
@@ -53,9 +54,11 @@ type OdrRequest interface {
 
 // TrieID identifies a state or account storage trie
 type TrieID struct {
-	BlockHash, Root common.Hash
-	BlockNumber     uint64
-	AccKey          []byte
+	BlockHash   common.Hash
+	BlockNumber uint64
+	StateRoot   common.Hash
+	Root        common.Hash
+	AccKey      []byte
 }
 
 // StateTrieID returns a TrieID for a state trie belonging to a certain block
@@ -64,8 +67,9 @@ func StateTrieID(header *types.Header) *TrieID {
 	return &TrieID{
 		BlockHash:   header.Hash(),
 		BlockNumber: header.Number.Uint64(),
-		AccKey:      nil,
+		StateRoot:   header.Root,
 		Root:        header.Root,
+		AccKey:      nil,
 	}
 }
 
@@ -76,6 +80,7 @@ func StorageTrieID(state *TrieID, addrHash, root common.Hash) *TrieID {
 	return &TrieID{
 		BlockHash:   state.BlockHash,
 		BlockNumber: state.BlockNumber,
+		StateRoot:   state.StateRoot,
 		AccKey:      addrHash[:],
 		Root:        root,
 	}
@@ -178,7 +183,7 @@ func (req *BloomRequest) StoreResult(db ethdb.Database) {
 
 // TxStatus describes the status of a transaction
 type TxStatus struct {
-	Status core.TxStatus
+	Status txpool.TxStatus
 	Lookup *rawdb.LegacyTxLookupEntry `rlp:"nil"`
 	Error  string
 }

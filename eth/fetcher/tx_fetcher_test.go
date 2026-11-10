@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package fetcher
 
@@ -25,7 +25,7 @@ import (
 
 	"github.com/popcateum/go-popcateum/common"
 	"github.com/popcateum/go-popcateum/common/mclock"
-	"github.com/popcateum/go-popcateum/core"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 )
 
@@ -304,7 +304,6 @@ func TestTransactionFetcherSingletonRequesting(t *testing.T) {
 func TestTransactionFetcherFailedRescheduling(t *testing.T) {
 	// Create a channel to control when tx requests can fail
 	proceed := make(chan struct{})
-
 	testTransactionFetcherParallel(t, txFetcherTest{
 		init: func() *TxFetcher {
 			return NewTxFetcher(
@@ -870,9 +869,9 @@ func TestTransactionFetcherUnderpricedDedup(t *testing.T) {
 					errs := make([]error, len(txs))
 					for i := 0; i < len(errs); i++ {
 						if i%2 == 0 {
-							errs[i] = core.ErrUnderpriced
+							errs[i] = txpool.ErrUnderpriced
 						} else {
-							errs[i] = core.ErrReplaceUnderpriced
+							errs[i] = txpool.ErrReplaceUnderpriced
 						}
 					}
 					return errs
@@ -942,7 +941,7 @@ func TestTransactionFetcherUnderpricedDoSProtection(t *testing.T) {
 				func(txs []*types.Transaction) []error {
 					errs := make([]error, len(txs))
 					for i := 0; i < len(errs); i++ {
-						errs[i] = core.ErrUnderpriced
+						errs[i] = txpool.ErrUnderpriced
 					}
 					return errs
 				},
@@ -1012,7 +1011,7 @@ func TestTransactionFetcherOutOfBoundDeliveries(t *testing.T) {
 }
 
 // Tests that dropping a peer cleans out all internal data structures in all the
-// live or danglng stages.
+// live or dangling stages.
 func TestTransactionFetcherDrop(t *testing.T) {
 	testTransactionFetcherParallel(t, txFetcherTest{
 		init: func() *TxFetcher {
@@ -1122,7 +1121,7 @@ func TestTransactionFetcherDropRescheduling(t *testing.T) {
 }
 
 // This test reproduces a crash caught by the fuzzer. The root cause was a
-// dangling transaction timing out and clashing on readd with a concurrently
+// dangling transaction timing out and clashing on re-add with a concurrently
 // announced one.
 func TestTransactionFetcherFuzzCrash01(t *testing.T) {
 	testTransactionFetcherParallel(t, txFetcherTest{
@@ -1149,7 +1148,7 @@ func TestTransactionFetcherFuzzCrash01(t *testing.T) {
 }
 
 // This test reproduces a crash caught by the fuzzer. The root cause was a
-// dangling transaction getting peer-dropped and clashing on readd with a
+// dangling transaction getting peer-dropped and clashing on re-add with a
 // concurrently announced one.
 func TestTransactionFetcherFuzzCrash02(t *testing.T) {
 	testTransactionFetcherParallel(t, txFetcherTest{
@@ -1262,6 +1261,16 @@ func testTransactionFetcher(t *testing.T, tt txFetcherTest) {
 
 	fetcher.Start()
 	defer fetcher.Stop()
+
+	defer func() { // drain the wait chan on exit
+		for {
+			select {
+			case <-wait:
+			default:
+				return
+			}
+		}
+	}()
 
 	// Crunch through all the test steps and execute them
 	for i, step := range tt.steps {

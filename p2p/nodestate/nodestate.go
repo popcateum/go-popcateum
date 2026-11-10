@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package nodestate
 
@@ -117,7 +117,7 @@ type (
 		decode func([]byte) (interface{}, error)
 	}
 
-	// stateSetup contains the list of flags and fields used by the application
+	// Setup contains the list of flags and fields used by the application
 	Setup struct {
 		Version uint
 		flags   []flagDefinition
@@ -808,7 +808,14 @@ func (ns *NodeStateMachine) addTimeout(n *enode.Node, mask bitMask, timeout time
 	ns.removeTimeouts(node, mask)
 	t := &nodeStateTimeout{mask: mask}
 	t.timer = ns.clock.AfterFunc(timeout, func() {
-		ns.SetState(n, Flags{}, Flags{mask: t.mask, setup: ns.setup}, 0)
+		ns.lock.Lock()
+		defer ns.lock.Unlock()
+
+		if !ns.opStart() {
+			return
+		}
+		ns.setState(n, Flags{}, Flags{mask: t.mask, setup: ns.setup}, 0)
+		ns.opFinish()
 	})
 	node.timeouts = append(node.timeouts, t)
 	if mask&ns.saveFlags != 0 {

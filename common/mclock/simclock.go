@@ -1,18 +1,18 @@
-// Copyright 2018 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2018 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package mclock
 
@@ -58,7 +58,7 @@ func (s *Simulated) Run(d time.Duration) {
 	s.mu.Lock()
 	s.init()
 
-	end := s.now + AbsTime(d)
+	end := s.now.Add(d)
 	var do []func()
 	for len(s.scheduled) > 0 && s.scheduled[0].at <= end {
 		ev := heap.Pop(&s.scheduled).(*simTimer)
@@ -134,7 +134,7 @@ func (s *Simulated) AfterFunc(d time.Duration, fn func()) Timer {
 func (s *Simulated) schedule(d time.Duration, fn func()) *simTimer {
 	s.init()
 
-	at := s.now + AbsTime(d)
+	at := s.now.Add(d)
 	ev := &simTimer{do: fn, at: at, s: s}
 	heap.Push(&s.scheduled, ev)
 	s.cond.Broadcast()

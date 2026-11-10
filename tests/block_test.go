@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package tests
 
@@ -43,15 +43,15 @@ func TestBlockchain(t *testing.T) {
 
 	// Very slow test
 	bt.skipLoad(`.*/stTimeConsuming/.*`)
-
 	// test takes a lot for time and goes easily OOM because of sha3 calculation on a huge range,
 	// using 4.6 TGas
 	bt.skipLoad(`.*randomStatetest94.json.*`)
+
 	bt.walk(t, blockTestDir, func(t *testing.T, name string, test *BlockTest) {
-		if err := bt.checkFailure(t, name+"/trie", test.Run(false)); err != nil {
+		if err := bt.checkFailure(t, test.Run(false)); err != nil {
 			t.Errorf("test without snapshotter failed: %v", err)
 		}
-		if err := bt.checkFailure(t, name+"/snap", test.Run(true)); err != nil {
+		if err := bt.checkFailure(t, test.Run(true)); err != nil {
 			t.Errorf("test with snapshotter failed: %v", err)
 		}
 	})

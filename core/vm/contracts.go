@@ -1,18 +1,18 @@
-// Copyright 2014 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2014 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
 
@@ -29,8 +29,6 @@ import (
 	"github.com/popcateum/go-popcateum/crypto/bls12381"
 	"github.com/popcateum/go-popcateum/crypto/bn256"
 	"github.com/popcateum/go-popcateum/params"
-
-	//lint:ignore SA1019 Needed for precompile
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -42,7 +40,7 @@ type PrecompiledContract interface {
 	Run(input []byte) ([]byte, error) // Run runs the precompiled contract
 }
 
-// PrecompiledContractsHomestead contains the default set of pre-compiled Popcateum
+// PrecompiledContractsHomestead contains the default set of pre-compiled Ethereum
 // contracts used in the Frontier and Homestead releases.
 var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
@@ -51,7 +49,7 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{4}): &dataCopy{},
 }
 
-// PrecompiledContractsByzantium contains the default set of pre-compiled Popcateum
+// PrecompiledContractsByzantium contains the default set of pre-compiled Ethereum
 // contracts used in the Byzantium release.
 var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
@@ -64,7 +62,7 @@ var PrecompiledContractsByzantium = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}): &bn256PairingByzantium{},
 }
 
-// PrecompiledContractsIstanbul contains the default set of pre-compiled Popcateum
+// PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
 // contracts used in the Istanbul release.
 var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
@@ -78,7 +76,7 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2F{},
 }
 
-// PrecompiledContractsBerlin contains the default set of pre-compiled Popcateum
+// PrecompiledContractsBerlin contains the default set of pre-compiled Ethereum
 // contracts used in the Berlin release.
 var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
@@ -92,7 +90,7 @@ var PrecompiledContractsBerlin = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2F{},
 }
 
-// PrecompiledContractsBLS contains the set of pre-compiled Popcateum
+// PrecompiledContractsBLS contains the set of pre-compiled Ethereum
 // contracts specified in EIP-2537. These are exported for testing purposes.
 var PrecompiledContractsBLS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{10}): &bls12381G1Add{},
@@ -237,7 +235,7 @@ func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
 func (c *dataCopy) Run(in []byte) ([]byte, error) {
-	return in, nil
+	return common.CopyBytes(in), nil
 }
 
 // bigModExp implements a native big integer exponential modular operation.
@@ -265,10 +263,10 @@ var (
 
 // modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
 //
-// def mult_complexity(x):
-//    if x <= 64: return x ** 2
-//    elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//    else: return x ** 2 // 16 + 480 * x - 199680
+//	def mult_complexity(x):
+//		if x <= 64: return x ** 2
+//		elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//		else: return x ** 2 // 16 + 480 * x - 199680
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
 func modexpMultComplexity(x *big.Int) *big.Int {
@@ -330,7 +328,7 @@ func (c *bigModExp) RequiredGas(input []byte) uint64 {
 	if c.eip2565 {
 		// EIP-2565 has three changes
 		// 1. Different multComplexity (inlined here)
-		// in EIP-2565 (https://eips.popcateum.org/EIPS/eip-2565):
+		// in EIP-2565 (https://eips.ethereum.org/EIPS/eip-2565):
 		//
 		// def mult_complexity(x):
 		//    ceiling(x/8)^2
@@ -382,12 +380,19 @@ func (c *bigModExp) Run(input []byte) ([]byte, error) {
 		base = new(big.Int).SetBytes(getData(input, 0, baseLen))
 		exp  = new(big.Int).SetBytes(getData(input, baseLen, expLen))
 		mod  = new(big.Int).SetBytes(getData(input, baseLen+expLen, modLen))
+		v    []byte
 	)
-	if mod.BitLen() == 0 {
+	switch {
+	case mod.BitLen() == 0:
 		// Modulo 0 is undefined, return zero
 		return common.LeftPadBytes([]byte{}, int(modLen)), nil
+	case base.BitLen() == 1: // a bit length of 1 means it's 1 (or -1).
+		//If base == 1, then we can just return base % mod (if mod >= 1, which it is)
+		v = base.Mod(base, mod).Bytes()
+	default:
+		v = base.Exp(base, exp, mod).Bytes()
 	}
-	return common.LeftPadBytes(base.Exp(base, exp, mod).Bytes(), int(modLen)), nil
+	return common.LeftPadBytes(v, int(modLen)), nil
 }
 
 // newCurvePoint unmarshals a binary blob into a bn256 elliptic curve point,
@@ -591,7 +596,7 @@ func (c *blake2F) Run(input []byte) ([]byte, error) {
 	// Parse the input into the Blake2b call parameters
 	var (
 		rounds = binary.BigEndian.Uint32(input[0:4])
-		final  = (input[212] == blake2FFinalBlockBytes)
+		final  = input[212] == blake2FFinalBlockBytes
 
 		h [8]uint64
 		m [16]uint64
@@ -937,7 +942,7 @@ func (c *bls12381Pairing) Run(input []byte) ([]byte, error) {
 			return nil, errBLS12381G2PointSubgroup
 		}
 
-		// Update pairing engine with G1 and G2 ponits
+		// Update pairing engine with G1 and G2 points
 		e.AddPair(p1, p2)
 	}
 	// Prepare 32 byte output

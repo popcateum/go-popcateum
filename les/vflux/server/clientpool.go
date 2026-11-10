@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package server
 
@@ -34,7 +34,7 @@ import (
 var (
 	ErrNotConnected    = errors.New("client not connected")
 	ErrNoPriority      = errors.New("priority too low to raise capacity")
-	ErrCantFindMaximum = errors.New("Unable to find maximum allowed capacity")
+	ErrCantFindMaximum = errors.New("unable to find maximum allowed capacity")
 )
 
 // ClientPool implements a client database that assigns a priority to each client
@@ -53,7 +53,7 @@ var (
 // each client can have several minutes of connection time.
 //
 // Balances of disconnected clients are stored in nodeDB including positive balance
-// and negative banalce. Boeth positive balance and negative balance will decrease
+// and negative balance. Both positive balance and negative balance will decrease
 // exponentially. If the balance is low enough, then the record will be dropped.
 type ClientPool struct {
 	*priorityPool
@@ -61,7 +61,6 @@ type ClientPool struct {
 
 	setup  *serverSetup
 	clock  mclock.Clock
-	closed bool
 	ns     *nodestate.NodeStateMachine
 	synced func() bool
 
@@ -143,8 +142,10 @@ func NewClientPool(balanceDb ethdb.KeyValueStore, minCap uint64, connectedBias t
 		if oldState.HasAll(cp.setup.activeFlag) && oldState.HasNone(cp.setup.activeFlag) {
 			clientDeactivatedMeter.Mark(1)
 		}
-		_, connected := cp.Active()
-		totalConnectedGauge.Update(int64(connected))
+		activeCount, activeCap := cp.Active()
+		totalActiveCountGauge.Update(int64(activeCount))
+		totalActiveCapacityGauge.Update(int64(activeCap))
+		totalInactiveCountGauge.Update(int64(cp.Inactive()))
 	})
 	return cp
 }
@@ -175,7 +176,7 @@ func (cp *ClientPool) Unregister(peer clientPeer) {
 	cp.ns.SetField(peer.Node(), cp.setup.clientField, nil)
 }
 
-// setConnectedBias sets the connection bias, which is applied to already connected clients
+// SetConnectedBias sets the connection bias, which is applied to already connected clients
 // So that already connected client won't be kicked out very soon and we can ensure all
 // connected clients can have enough time to request or sync some data.
 func (cp *ClientPool) SetConnectedBias(bias time.Duration) {

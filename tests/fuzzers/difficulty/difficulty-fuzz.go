@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package difficulty
 
@@ -30,7 +30,6 @@ import (
 type fuzzer struct {
 	input     io.Reader
 	exhausted bool
-	debugging bool
 }
 
 func (f *fuzzer) read(size int) []byte {
@@ -67,12 +66,14 @@ func (f *fuzzer) readBool() bool {
 	return f.read(1)[0]&0x1 == 0
 }
 
-// The function must return
-// 1 if the fuzzer should increase priority of the
-//    given input during subsequent fuzzing (for example, the input is lexically
-//    correct and was parsed successfully);
-// -1 if the input must not be added to corpus even if gives new coverage; and
-// 0  otherwise
+// Fuzz function must return
+//
+//   - 1 if the fuzzer should increase priority of the
+//     given input during subsequent fuzzing (for example, the input is lexically
+//     correct and was parsed successfully);
+//   - -1 if the input must not be added to corpus even if gives new coverage; and
+//   - 0 otherwise
+//
 // other values are reserved for future use.
 func Fuzz(data []byte) int {
 	f := fuzzer{
@@ -130,10 +131,9 @@ func (f *fuzzer) fuzz() int {
 		bigFn  calculator
 		u256Fn calculator
 	}{
-		{ethash.FrontierDifficultyCalulator, ethash.CalcDifficultyFrontierU256},
-		{ethash.HomesteadDifficultyCalulator, ethash.CalcDifficultyHomesteadU256},
+		{ethash.FrontierDifficultyCalculator, ethash.CalcDifficultyFrontierU256},
+		{ethash.HomesteadDifficultyCalculator, ethash.CalcDifficultyHomesteadU256},
 		{ethash.DynamicDifficultyCalculator(bombDelay), ethash.MakeDifficultyCalculatorU256(bombDelay)},
-		{ethash.DynamicPopcateumDifficultyCalculator(bombDelay), ethash.MakePopcateumDifficultyCalculatorU256(bombDelay)},
 	} {
 		want := pair.bigFn(time, header)
 		have := pair.u256Fn(time, header)

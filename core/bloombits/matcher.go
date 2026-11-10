@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package bloombits
 
@@ -83,7 +83,7 @@ type Matcher struct {
 	retrievals chan chan *Retrieval // Retriever processes waiting for task allocations
 	deliveries chan *Retrieval      // Retriever processes waiting for task response deliveries
 
-	running uint32 // Atomic flag whether a session is live or not
+	running atomic.Bool // Atomic flag whether a session is live or not
 }
 
 // NewMatcher creates a new pipeline for retrieving bloom bit streams and doing
@@ -146,10 +146,10 @@ func (m *Matcher) addScheduler(idx uint) {
 // channel is closed.
 func (m *Matcher) Start(ctx context.Context, begin, end uint64, results chan uint64) (*MatcherSession, error) {
 	// Make sure we're not creating concurrent sessions
-	if atomic.SwapUint32(&m.running, 1) == 1 {
+	if m.running.Swap(true) {
 		return nil, errors.New("matcher already running")
 	}
-	defer atomic.StoreUint32(&m.running, 0)
+	defer m.running.Store(false)
 
 	// Initiate a new matching round
 	session := &MatcherSession{
@@ -510,8 +510,9 @@ type MatcherSession struct {
 	closer sync.Once     // Sync object to ensure we only ever close once
 	quit   chan struct{} // Quit channel to request pipeline termination
 
-	ctx context.Context // Context used by the light client to abort filtering
-	err atomic.Value    // Global error to track retrieval failures deep in the chain
+	ctx     context.Context // Context used by the light client to abort filtering
+	err     error           // Global error to track retrieval failures deep in the chain
+	errLock sync.Mutex
 
 	pend sync.WaitGroup
 }
@@ -529,10 +530,10 @@ func (s *MatcherSession) Close() {
 
 // Error returns any failure encountered during the matching session.
 func (s *MatcherSession) Error() error {
-	if err := s.err.Load(); err != nil {
-		return err.(error)
-	}
-	return nil
+	s.errLock.Lock()
+	defer s.errLock.Unlock()
+
+	return s.err
 }
 
 // allocateRetrieval assigns a bloom bit index to a client process that can either
@@ -611,7 +612,7 @@ func (s *MatcherSession) Multiplex(batch int, wait time.Duration, mux chan chan 
 				return
 
 			case <-time.After(wait):
-				// Throttling up, fetch whatever's available
+				// Throttling up, fetch whatever is available
 			}
 		}
 		// Allocate as much as we can handle and request servicing
@@ -630,7 +631,9 @@ func (s *MatcherSession) Multiplex(batch int, wait time.Duration, mux chan chan 
 
 			result := <-request
 			if result.Error != nil {
-				s.err.Store(result.Error)
+				s.errLock.Lock()
+				s.err = result.Error
+				s.errLock.Unlock()
 				s.Close()
 			}
 			s.deliverSections(result.Bit, result.Sections, result.Bitsets)

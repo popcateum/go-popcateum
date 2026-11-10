@@ -1,18 +1,18 @@
-// Copyright 2017 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2017 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package asm
 
@@ -39,7 +39,7 @@ type Compiler struct {
 	debug bool
 }
 
-// newCompiler returns a new allocated compiler.
+// NewCompiler returns a new allocated compiler.
 func NewCompiler(debug bool) *Compiler {
 	return &Compiler{
 		labels: make(map[string]int),
@@ -105,16 +105,16 @@ func (c *Compiler) Compile() (string, []error) {
 	}
 
 	// turn the binary to hex
-	var bin string
+	var bin strings.Builder
 	for _, v := range c.binary {
 		switch v := v.(type) {
 		case vm.OpCode:
-			bin += fmt.Sprintf("%x", []byte{byte(v)})
+			bin.WriteString(fmt.Sprintf("%x", []byte{byte(v)}))
 		case []byte:
-			bin += fmt.Sprintf("%x", v)
+			bin.WriteString(fmt.Sprintf("%x", v))
 		}
 	}
-	return bin, errors
+	return bin.String(), errors
 }
 
 // next returns the next token and increments the
@@ -243,12 +243,12 @@ func (c *Compiler) pushBin(v interface{}) {
 // isPush returns whether the string op is either any of
 // push(N).
 func isPush(op string) bool {
-	return strings.ToUpper(op) == "PUSH"
+	return strings.EqualFold(op, "PUSH")
 }
 
 // isJump returns whether the string op is jump(i)
 func isJump(op string) bool {
-	return strings.ToUpper(op) == "JUMPI" || strings.ToUpper(op) == "JUMP"
+	return strings.EqualFold(op, "JUMPI") || strings.EqualFold(op, "JUMP")
 }
 
 // toBinary converts text to a vm.OpCode

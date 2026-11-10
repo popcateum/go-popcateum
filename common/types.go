@@ -1,18 +1,18 @@
-// Copyright 2015 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2015 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package common
 
@@ -86,7 +86,7 @@ func (h Hash) String() string {
 }
 
 // Format implements fmt.Formatter.
-// Hash supports the %v, %s, %v, %x, %X and %d format verbs.
+// Hash supports the %v, %s, %q, %x, %X and %d format verbs.
 func (h Hash) Format(s fmt.State, c rune) {
 	hexb := make([]byte, 2+len(h)*2)
 	copy(hexb, "0x")
@@ -197,7 +197,7 @@ func (h UnprefixedHash) MarshalText() ([]byte, error) {
 
 /////////// Address
 
-// Address represents the 20 byte address of an Popcateum account.
+// Address represents the 20 byte address of an Ethereum account.
 type Address [AddressLength]byte
 
 // BytesToAddress returns Address with value b.
@@ -217,7 +217,7 @@ func BigToAddress(b *big.Int) Address { return BytesToAddress(b.Bytes()) }
 func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
 
 // IsHexAddress verifies whether a string can represent a valid hex-encoded
-// Popcateum address or not.
+// Ethereum address or not.
 func IsHexAddress(s string) bool {
 	if has0xPrefix(s) {
 		s = s[2:]
@@ -230,6 +230,9 @@ func (a Address) Bytes() []byte { return a[:] }
 
 // Hash converts an address to a hash by left-padding it with zeros.
 func (a Address) Hash() Hash { return BytesToHash(a[:]) }
+
+// Big converts an address to a big integer.
+func (a Address) Big() *big.Int { return new(big.Int).SetBytes(a[:]) }
 
 // Hex returns an EIP55-compliant hex string representation of the address.
 func (a Address) Hex() string {
@@ -270,7 +273,7 @@ func (a Address) hex() []byte {
 }
 
 // Format implements fmt.Formatter.
-// Address supports the %v, %s, %v, %x, %X and %d format verbs.
+// Address supports the %v, %s, %q, %x, %X and %d format verbs.
 func (a Address) Format(s fmt.State, c rune) {
 	switch c {
 	case 'v', 's':
@@ -397,7 +400,7 @@ func (ma *MixedcaseAddress) UnmarshalJSON(input []byte) error {
 }
 
 // MarshalJSON marshals the original value
-func (ma *MixedcaseAddress) MarshalJSON() ([]byte, error) {
+func (ma MixedcaseAddress) MarshalJSON() ([]byte, error) {
 	if strings.HasPrefix(ma.original, "0x") || strings.HasPrefix(ma.original, "0X") {
 		return json.Marshal(fmt.Sprintf("0x%s", ma.original[2:]))
 	}

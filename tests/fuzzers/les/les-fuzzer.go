@@ -1,18 +1,18 @@
-// Copyright 2021 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2021 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package les
 
@@ -26,6 +26,7 @@ import (
 	"github.com/popcateum/go-popcateum/consensus/ethash"
 	"github.com/popcateum/go-popcateum/core"
 	"github.com/popcateum/go-popcateum/core/rawdb"
+	"github.com/popcateum/go-popcateum/core/txpool"
 	"github.com/popcateum/go-popcateum/core/types"
 	"github.com/popcateum/go-popcateum/core/vm"
 	"github.com/popcateum/go-popcateum/crypto"
@@ -38,7 +39,7 @@ import (
 var (
 	bankKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	bankAddr   = crypto.PubkeyToAddress(bankKey.PublicKey)
-	bankFunds  = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Popcat))
+	bankFunds  = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
 
 	testChainLen     = 256
 	testContractCode = common.Hex2Bytes("606060405260cc8060106000396000f360606040526000357c01000000000000000000000000000000000000000000000000000000009004806360cd2685146041578063c16431b914606b57603f565b005b6055600480803590602001909190505060a9565b6040518082815260200191505060405180910390f35b60886004808035906020019091908035906020019091905050608a565b005b80600060005083606481101560025790900160005b50819055505b5050565b6000600060005082606481101560025790900160005b5054905060c7565b91905056")
@@ -54,15 +55,13 @@ var (
 )
 
 func makechain() (bc *core.BlockChain, addrHashes, txHashes []common.Hash) {
-	db := rawdb.NewMemoryDatabase()
-	gspec := core.Genesis{
+	gspec := &core.Genesis{
 		Config:   params.TestChainConfig,
 		Alloc:    core.GenesisAlloc{bankAddr: {Balance: bankFunds}},
 		GasLimit: 100000000,
 	}
-	genesis := gspec.MustCommit(db)
 	signer := types.HomesteadSigner{}
-	blocks, _ := core.GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, testChainLen,
+	_, blocks, _ := core.GenerateChainWithGenesis(gspec, ethash.NewFaker(), testChainLen,
 		func(i int, gen *core.BlockGen) {
 			var (
 				tx   *types.Transaction
@@ -80,7 +79,7 @@ func makechain() (bc *core.BlockChain, addrHashes, txHashes []common.Hash) {
 			addrHashes = append(addrHashes, crypto.Keccak256Hash(addr[:]))
 			txHashes = append(txHashes, tx.Hash())
 		})
-	bc, _ = core.NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{}, nil, nil)
+	bc, _ = core.NewBlockChain(rawdb.NewMemoryDatabase(), nil, gspec, nil, ethash.NewFaker(), vm.Config{}, nil, nil)
 	if _, err := bc.InsertChain(blocks); err != nil {
 		panic(err)
 	}
@@ -88,19 +87,19 @@ func makechain() (bc *core.BlockChain, addrHashes, txHashes []common.Hash) {
 }
 
 func makeTries() (chtTrie *trie.Trie, bloomTrie *trie.Trie, chtKeys, bloomKeys [][]byte) {
-	chtTrie, _ = trie.New(common.Hash{}, trie.NewDatabase(rawdb.NewMemoryDatabase()))
-	bloomTrie, _ = trie.New(common.Hash{}, trie.NewDatabase(rawdb.NewMemoryDatabase()))
+	chtTrie = trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
+	bloomTrie = trie.NewEmpty(trie.NewDatabase(rawdb.NewMemoryDatabase()))
 	for i := 0; i < testChainLen; i++ {
 		// The element in CHT is <big-endian block number> -> <block hash>
 		key := make([]byte, 8)
 		binary.BigEndian.PutUint64(key, uint64(i+1))
-		chtTrie.Update(key, []byte{0x1, 0xf})
+		chtTrie.MustUpdate(key, []byte{0x1, 0xf})
 		chtKeys = append(chtKeys, key)
 
 		// The element in Bloom trie is <2 byte bit index> + <big-endian block number> -> bloom
 		key2 := make([]byte, 10)
 		binary.BigEndian.PutUint64(key2[2:], uint64(i+1))
-		bloomTrie.Update(key2, []byte{0x2, 0xe})
+		bloomTrie.MustUpdate(key2, []byte{0x2, 0xe})
 		bloomKeys = append(bloomKeys, key2)
 	}
 	return
@@ -113,7 +112,7 @@ func init() {
 
 type fuzzer struct {
 	chain *core.BlockChain
-	pool  *core.TxPool
+	pool  *txpool.TxPool
 
 	chainLen  int
 	addr, txs []common.Hash
@@ -139,7 +138,7 @@ func newFuzzer(input []byte) *fuzzer {
 		chtKeys:   chtKeys,
 		bloomKeys: bloomKeys,
 		nonce:     uint64(len(txHashes)),
-		pool:      core.NewTxPool(core.DefaultTxPoolConfig, params.TestChainConfig, chain),
+		pool:      txpool.NewTxPool(txpool.DefaultConfig, params.TestChainConfig, chain),
 		input:     bytes.NewReader(input),
 	}
 }
@@ -231,7 +230,7 @@ func (f *fuzzer) BlockChain() *core.BlockChain {
 	return f.chain
 }
 
-func (f *fuzzer) TxPool() *core.TxPool {
+func (f *fuzzer) TxPool() *txpool.TxPool {
 	return f.pool
 }
 

@@ -1,18 +1,18 @@
-// Copyright 2019 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2019 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package rpc
 
@@ -70,7 +70,17 @@ func (testError) Error() string          { return "testError" }
 func (testError) ErrorCode() int         { return 444 }
 func (testError) ErrorData() interface{} { return "testError data" }
 
+type MarshalErrObj struct{}
+
+func (o *MarshalErrObj) MarshalText() ([]byte, error) {
+	return nil, errors.New("marshal error")
+}
+
 func (s *testService) NoArgsRets() {}
+
+func (s *testService) Null() any {
+	return nil
+}
 
 func (s *testService) Echo(str string, i int, args *echoArgs) echoResult {
 	return echoResult{str, i, args}
@@ -78,6 +88,10 @@ func (s *testService) Echo(str string, i int, args *echoArgs) echoResult {
 
 func (s *testService) EchoWithCtx(ctx context.Context, str string, i int, args *echoArgs) echoResult {
 	return echoResult{str, i, args}
+}
+
+func (s *testService) PeerInfo(ctx context.Context) PeerInfo {
+	return PeerInfoFromContext(ctx)
 }
 
 func (s *testService) Sleep(ctx context.Context, duration time.Duration) {
@@ -108,6 +122,14 @@ func (s *testService) InvalidRets3() (string, string, error) {
 
 func (s *testService) ReturnError() error {
 	return testError{}
+}
+
+func (s *testService) MarshalError() *MarshalErrObj {
+	return &MarshalErrObj{}
+}
+
+func (s *testService) Panic() string {
+	panic("service panic")
 }
 
 func (s *testService) CallMeBack(ctx context.Context, method string, args []interface{}) (interface{}, error) {

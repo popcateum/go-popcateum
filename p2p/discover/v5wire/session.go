@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package v5wire
 
@@ -22,10 +22,10 @@ import (
 	"encoding/binary"
 	"time"
 
+	"github.com/popcateum/go-popcateum/common/lru"
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/crypto"
 	"github.com/popcateum/go-popcateum/p2p/enode"
-	"github.com/hashicorp/golang-lru/simplelru"
 )
 
 const handshakeTimeout = time.Second
@@ -33,7 +33,7 @@ const handshakeTimeout = time.Second
 // The SessionCache keeps negotiated encryption keys and
 // state for in-progress handshakes in the Discovery v5 wire protocol.
 type SessionCache struct {
-	sessions   *simplelru.LRU
+	sessions   lru.BasicLRU[sessionID, *session]
 	handshakes map[sessionID]*Whoareyou
 	clock      mclock.Clock
 
@@ -62,12 +62,8 @@ func (s *session) keysFlipped() *session {
 }
 
 func NewSessionCache(maxItems int, clock mclock.Clock) *SessionCache {
-	cache, err := simplelru.NewLRU(maxItems, nil)
-	if err != nil {
-		panic("can't create session cache")
-	}
 	return &SessionCache{
-		sessions:        cache,
+		sessions:        lru.NewBasicLRU[sessionID, *session](maxItems),
 		handshakes:      make(map[sessionID]*Whoareyou),
 		clock:           clock,
 		nonceGen:        generateNonce,
@@ -95,11 +91,8 @@ func (sc *SessionCache) nextNonce(s *session) (Nonce, error) {
 
 // session returns the current session for the given node, if any.
 func (sc *SessionCache) session(id enode.ID, addr string) *session {
-	item, ok := sc.sessions.Get(sessionID{id, addr})
-	if !ok {
-		return nil
-	}
-	return item.(*session)
+	item, _ := sc.sessions.Get(sessionID{id, addr})
+	return item
 }
 
 // readKey returns the current read key for the given node.

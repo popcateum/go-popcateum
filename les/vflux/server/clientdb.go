@@ -1,18 +1,18 @@
-// Copyright 2020 The go-popcateum Authors
-// This file is part of the go-popcateum library.
+// Copyright 2020 The go-ethereum Authors
+// This file is part of the go-ethereum library.
 //
-// The go-popcateum library is free software: you can redistribute it and/or modify
+// The go-ethereum library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-popcateum library is distributed in the hope that it will be useful,
+// The go-ethereum library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-popcateum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package server
 
@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/common/lru"
 	"github.com/popcateum/go-popcateum/common/mclock"
 	"github.com/popcateum/go-popcateum/ethdb"
 	"github.com/popcateum/go-popcateum/les/utils"
 	"github.com/popcateum/go-popcateum/log"
 	"github.com/popcateum/go-popcateum/p2p/enode"
 	"github.com/popcateum/go-popcateum/rlp"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -57,7 +57,7 @@ var (
 
 type nodeDB struct {
 	db            ethdb.KeyValueStore
-	cache         *lru.Cache
+	cache         *lru.Cache[string, utils.ExpiredValue]
 	auxbuf        []byte                                              // 37-byte auxiliary buffer for key encoding
 	verbuf        [2]byte                                             // 2-byte auxiliary buffer for db version
 	evictCallBack func(mclock.AbsTime, bool, utils.ExpiredValue) bool // Callback to determine whether the balance can be evicted.
@@ -67,10 +67,9 @@ type nodeDB struct {
 }
 
 func newNodeDB(db ethdb.KeyValueStore, clock mclock.Clock) *nodeDB {
-	cache, _ := lru.New(balanceCacheLimit)
 	ndb := &nodeDB{
 		db:      db,
-		cache:   cache,
+		cache:   lru.NewCache[string, utils.ExpiredValue](balanceCacheLimit),
 		auxbuf:  make([]byte, 37),
 		clock:   clock,
 		closeCh: make(chan struct{}),
@@ -125,8 +124,9 @@ func (db *nodeDB) getOrNewBalance(id []byte, neg bool) utils.ExpiredValue {
 	key := db.key(id, neg)
 	item, exist := db.cache.Get(string(key))
 	if exist {
-		return item.(utils.ExpiredValue)
+		return item
 	}
+
 	var b utils.ExpiredValue
 	enc, err := db.db.Get(key)
 	if err != nil || len(enc) == 0 {
