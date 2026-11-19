@@ -2,7 +2,7 @@
 # with Go source code. If you know what GOPATH is then you probably
 # don't need to bother with make.
 
-.PHONY: gpop android ios evm all test clean
+.PHONY: gpop depositctl android ios evm all test clean
 
 GOBIN = ./build/bin
 GO ?= latest
@@ -14,6 +14,9 @@ gpop:
 	$(GORUN) build/ci.go install ./cmd/gpop
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/gpop\" to launch gpop."
+
+depositctl:
+	$(GORUN) build/ci.go install ./cmd/depositctl
 
 all:
 	$(GORUN) build/ci.go install

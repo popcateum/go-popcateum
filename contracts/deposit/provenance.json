@@ -1,0 +1,20 @@
+{
+  "repository": "https://github.com/ethereum/consensus-specs",
+  "tag": "v1.3.0",
+  "commit": "01b53691dcc36d37a5ad8994b3a32d8de69fb1aa",
+  "path": "solidity_deposit_contract",
+  "compiler": "0.6.11+commit.5ef660b1",
+  "optimizer_runs": 5000000,
+  "metadata_use_literal_content": true,
+  "files": {
+    "deposit_contract.sol": "2a8db249155e8502e1132f14410b8d7b2a924512723ed07a08167477d8f8c073",
+    "deposit_contract.json": "fbb573648e4fe96a6b731768cbf5165f5037d7bd29f43359c5316eeb9edc78e6"
+  },
+  "note": "Official source and ABI/creation bytecode vendored verbatim. No POP-specific Solidity modifications. Compiler target predates Shanghai; executable compatibility is tested on Berlin and London.",
+  "derived_runtime": {
+    "file": "runtime.hex",
+    "bytes": 6358,
+    "keccak256": "0x6c029a231254fadb724d63be769f75eedd66362df034a3e663252b49d062a666",
+    "derivation": "Creation bytecode executed by core/vm/runtime.Create; reproduced in TestDepositBerlinAndLondon."
+  }
+}

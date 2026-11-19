@@ -1,0 +1,58 @@
+{
+  "date_kst": "2026-11-11",
+  "base_client_commit": "e0c8733798ce7a690b6f54eddb7c2eebab0c4f69",
+  "toolchain": "Go 1.20.14",
+  "platform": "Darwin arm64",
+  "official_artifact_sha256": "fbb573648e4fe96a6b731768cbf5165f5037d7bd29f43359c5316eeb9edc78e6",
+  "official_upstream_commit": "01b53691dcc36d37a5ad8994b3a32d8de69fb1aa",
+  "runtime_code_keccak256": "0x6c029a231254fadb724d63be769f75eedd66362df034a3e663252b49d062a666",
+  "empty_deposit_root": "0xd70a234731285c6804c2a4f56711ddb8c82c99740f207854891028af34e27e5e",
+  "commands": [
+    {
+      "command": "make depositctl",
+      "result": "passed"
+    },
+    {
+      "command": "make all",
+      "result": "passed"
+    },
+    {
+      "command": "GPOP_BINARY=\"$PWD/build/bin/gpop\" GOTOOLCHAIN=go1.20.14 go test ./contracts/deposit ./cmd/depositctl -count=1 -v",
+      "result": "passed"
+    },
+    {
+      "command": "make lint",
+      "result": "passed"
+    }
+  ],
+  "tests": [
+    "Deploy the exact runtime under Berlin and London.",
+    "Initial count/root, two 32 POP deposits, SSZ root/count and all DepositEvent fields.",
+    "Revert incorrect root, too-small amount, fractional gwei, wrong pubkey length and plain value transfer without changing state.",
+    "Production genesis guard rejects the synthetic test chain.",
+    "Read-only plan leaves deployer nonce unchanged; TTD guard rejects a reached threshold.",
+    "Encrypted test keystore signs a PoW deployment, canonical receipt/runtime/root/count verified after confirmations.",
+    "Stale nonce plan rejected.",
+    "Timeout persists submitted journal; verify recovers using transaction hash.",
+    "Plan tampering rejected and existing output journal not overwritten."
+  ],
+  "isolated_deployment": {
+    "synthetic_genesis": true,
+    "genesis_override_only_in_go_test": true,
+    "network_access": "IPC only, peers disabled; local Engine listener unused",
+    "ethash": "small test DAG, not production epoch DAG",
+    "public_test_key": true,
+    "gas_used": 2146480,
+    "gas_price_wei": "2000000000",
+    "fee_pop": "0.004292960000000000",
+    "plan_maximum_fee_pop": "0.005171552000000000",
+    "phase": "verified"
+  },
+  "limitations": [
+    "No real Popcateum transaction was signed or broadcast.",
+    "No real keystore, validator keys or original chain DB were opened.",
+    "Contract EVM deposit tests use synthetic signatures and do not validate BLS or activate validators.",
+    "Actual deposit website/batch tool, beacon genesis/config and Merge finality remain follow-up work.",
+    "Full real-chain replay and non-macOS/Docker builds are not covered by this task."
+  ]
+}

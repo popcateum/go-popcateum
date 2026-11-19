@@ -26,6 +26,10 @@ make gpop
 
 전체 도구는 `make all`로 빌드한다. 이 저장소의 바이너리는 `gpop`이며 Ethereum 배포 사이트의 `geth` 바이너리로 대체하지 않는다.
 
+## 예치 컨트랙트 배포 준비
+
+`make depositctl`로 배포 도구를 빌드한다. [배포 안내](docs/deposit-deployment.md)의 `plan`은 읽기 전용이고, `send`만 암호화된 실행 지갑으로 서명·전송한다. 표준 계약을 배포할 때는 32 POP 예치금이 필요하지 않으며 가스 비용만 사용한다.
+
 ## 검증 도구
 
 ```sh

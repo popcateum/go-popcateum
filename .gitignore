@@ -48,3 +48,6 @@ profile.cov
 
 **/yarn-error.log
 logs/
+
+# Operator-specific deployment plans and transaction journals.
+/deployments/
