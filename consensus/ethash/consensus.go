@@ -266,6 +266,19 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 // stock Ethereum ethash engine.
 // See YP section 4.3.4. "Block Header Validity"
 func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool, unixNow int64) error {
+	// Bind mainnet's fixed TD schedule to its recorded pre-fork history.
+	// Private chains can use the same chain ID with a different genesis.
+	if header.Number.Cmp(big.NewInt(params.MainnetPopstarHeight)) == 0 &&
+		chain.Config().PopstarBlock != nil && header.Number.Cmp(chain.Config().PopstarBlock) == 0 &&
+		header.ParentHash != params.MainnetPrePopstarHash {
+		genesis := chain.GetHeaderByNumber(0)
+		if genesis == nil {
+			return consensus.ErrUnknownAncestor
+		}
+		if genesis.Hash() == params.MainnetGenesisHash {
+			return fmt.Errorf("invalid Popstar mainnet parent %s", header.ParentHash)
+		}
+	}
 	// Ensure that the header's extra-data section is of a reasonable size
 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
@@ -342,6 +355,8 @@ func (ethash *Ethash) CalcDifficulty(chain consensus.ChainHeaderReader, time uin
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
+	case config.IsPopstar(next):
+		return big.NewInt(params.PopstarPoWDifficulty)
 	case config.IsPopSong(next):
 		// PopSong continues across London; do not substitute Ethereum's
 		// nine-second adjustment or its bomb schedule on this chain.

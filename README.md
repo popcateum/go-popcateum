@@ -8,9 +8,9 @@
 |---|---|
 | Chain ID / Network ID | `1213` / `1213` |
 | 기존 이력 | genesis·PopSong(85,000)·Popcorn(4,000,000) 유지 |
-| London | `8,905,000` |
-| Terminal total difficulty | **`7288681830821503`** |
-| 첫 PoS 높이 | `8,910,000` 부근을 목표로 추정; 고정 높이가 아님 |
+| London · Popstar | `8,905,000` (두 예치 계약 설치 및 PoW 난이도 941,264 적용) |
+| Terminal total difficulty | **`7288759620794051`** |
+| 첫 PoS 높이 | `9,000,000` (마지막 PoW `8,999,999`) |
 | Shanghai | 아직 예약하지 않음; Merge 후 CL Capella와 함께 예약 |
 | 기본 포트 | HTTP `9506`, WS `9507`, Engine `9551`, P2P `60606` |
 | IPC / DB | `gpop.ipc` / `<datadir>/gpop/chaindata` |
@@ -26,18 +26,22 @@ make gpop
 
 전체 도구는 `make all`로 빌드한다. 이 저장소의 바이너리는 `gpop`이며 Ethereum 배포 사이트의 `geth` 바이너리로 대체하지 않는다.
 
-## 예치 컨트랙트 배포 준비
+## Popstar 예치 계약
 
-`make depositctl`로 배포 도구를 빌드한다. [배포 안내](docs/deposit-deployment.md)의 `plan`은 읽기 전용이고, `send`만 암호화된 실행 지갑으로 서명·전송한다. 표준 계약을 배포할 때는 32 POP 예치금이 필요하지 않으며 가스 비용만 사용한다.
+| 역할 | 주소 |
+|---|---|
+| Prysm이 추적하는 표준 예치 계약 | `0x909ca70000000000000000000000000000000001` |
+| 32 POP 일괄 예치 계약 | `0x909CA70000000000000000000000000000000002` |
+
+업그레이드한 마이너가 블록 8,905,000을 채굴하면 일반 거래 실행 전에 두 계약이 설치된다. Prysm의 예치 이벤트 조회 시작 높이도 8,905,000이다.
 
 ## 검증 도구
 
 ```sh
 GOTOOLCHAIN=go1.20.14 go test ./params ./consensus/... ./core/... ./miner ./eth/... ./cmd/gpop
-python3 scripts/estimate_ttd.py
 python3 scripts/smoke_transition.py
 ```
 
-TTD 스크립트는 저장된 공개 헤더로 추정치를 재현한다. `--rpc http://127.0.0.1:9506 --continuous`는 재개 후 관측값으로 다시 계산만 한다. 설정을 자동 변경하지 않는다. smoke 스크립트는 공개 테스트 키와 임시 체인·소형 테스트 DAG를 사용하며 실제 비콘 합의를 실행하지 않는다.
+smoke 스크립트는 공개 테스트 키와 임시 체인·소형 테스트 DAG를 사용하며 실제 비콘 합의를 실행하지 않는다.
 
 upstream: [Geth v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6), commit `ea9e62ca3db5c33aa7438ebf39c189afd53c6bf8`. 라이브러리 LGPL-3.0, `cmd` 실행 프로그램 GPL-3.0 등 기존 라이선스와 저작권 표기를 유지한다.

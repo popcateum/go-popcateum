@@ -1,4 +1,4 @@
-package batch
+package batch_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/contracts/batch"
 	"github.com/popcateum/go-popcateum/contracts/deposit"
 	"github.com/popcateum/go-popcateum/core/vm/runtime"
 	"github.com/popcateum/go-popcateum/params"
@@ -50,7 +51,7 @@ func TestBatchAtomicityAndRuntime(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			code, err := CreationCode(target)
+			code, err := batch.CreationCode(target)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -58,20 +59,20 @@ func TestBatchAtomicityAndRuntime(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expected, err := RuntimeCode(target)
+			expected, err := batch.RuntimeCode(target)
 			if err != nil || !bytes.Equal(deployed, expected) {
 				t.Fatal("immutable runtime mismatch", err)
 			}
-			extracted, err := TargetFromCreation(code)
+			extracted, err := batch.TargetFromCreation(code)
 			if err != nil || extracted != target {
 				t.Fatal("target mismatch", err)
 			}
-			wrong, _ := CreationCode(common.Address{99})
+			wrong, _ := batch.CreationCode(common.Address{99})
 			if _, _, _, err = runtime.Create(wrong, cfg); err == nil {
 				t.Fatal("accepted wrong target")
 			}
 			cfg.State.SetBalance(cfg.Origin, new(big.Int).Mul(big.NewInt(1000), big.NewInt(params.Ether)))
-			a, err := ABI()
+			a, err := batch.ABI()
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -797,6 +797,7 @@ func (w *worker) makeEnv(parent *types.Header, header *types.Header, coinbase co
 	if err != nil {
 		return nil, err
 	}
+	core.ApplyPopstar(w.chainConfig, header.Number, state)
 	state.StartPrefetcher("miner")
 
 	// Note the passed coinbase may be different with header.Coinbase.

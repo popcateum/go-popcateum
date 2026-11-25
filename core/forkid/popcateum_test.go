@@ -27,7 +27,7 @@ func TestPopcateumForkID(t *testing.T) {
 		}
 	}
 	legacy := *params.MainnetChainConfig
-	legacy.LondonBlock = nil
+	legacy.LondonBlock, legacy.PopstarBlock = nil, nil
 	legacy.LegacySeaPopBlock = big.NewInt(9000000)
 	remote := NewID(&legacy, params.MainnetGenesisHash, 8904999, 0)
 	before := newFilter(params.MainnetChainConfig, params.MainnetGenesisHash, func() (uint64, uint64) { return 8904999, 0 })

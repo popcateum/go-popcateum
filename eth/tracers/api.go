@@ -291,6 +291,7 @@ func (api *API) traceChain(start, end *types.Block, config *TraceConfig, closed 
 					signer   = types.MakeSigner(api.backend.ChainConfig(), task.block.Number())
 					blockCtx = core.NewEVMBlockContext(task.block.Header(), api.chainContext(ctx), nil)
 				)
+				core.ApplyPopstar(api.backend.ChainConfig(), task.block.Number(), task.statedb)
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
 					msg, _ := core.TransactionToMessage(tx, signer, task.block.BaseFee())
@@ -541,6 +542,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 		return nil, err
 	}
 	defer release()
+	core.ApplyPopstar(api.backend.ChainConfig(), block.Number(), statedb)
 
 	var (
 		roots              []common.Hash
@@ -608,6 +610,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		return nil, err
 	}
 	defer release()
+	core.ApplyPopstar(api.backend.ChainConfig(), block.Number(), statedb)
 
 	// JS tracers have high overhead. In this case run a parallel
 	// process that generates states in one thread and traces txes
@@ -750,6 +753,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		return nil, err
 	}
 	defer release()
+	core.ApplyPopstar(api.backend.ChainConfig(), block.Number(), statedb)
 
 	// Retrieve the tracing configurations, or use default values
 	var (

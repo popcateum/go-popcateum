@@ -31,10 +31,10 @@ func (c transitionChain) GetHeader(h common.Hash, n uint64) *types.Header {
 }
 
 func TestPopcateumTTDTransition(t *testing.T) {
-	parent := &types.Header{Number: big.NewInt(8909999), Time: 100, Difficulty: big.NewInt(1000000), GasLimit: 30000000, BaseFee: big.NewInt(params.InitialBaseFee), UncleHash: types.EmptyUncleHash}
+	parent := &types.Header{Number: big.NewInt(8_999_999), Time: 100, Difficulty: big.NewInt(params.PopstarPoWDifficulty), GasLimit: 30000000, BaseFee: big.NewInt(params.InitialBaseFee), UncleHash: types.EmptyUncleHash}
 	chain := transitionChain{parent: parent, td: new(big.Int).Set(params.MainnetTerminalTotalDifficulty)}
 	engine := New(ethash.NewFaker())
-	header := &types.Header{ParentHash: parent.Hash(), Number: big.NewInt(8910000), Time: 112, Difficulty: new(big.Int), GasLimit: parent.GasLimit, BaseFee: misc.CalcBaseFee(chain.Config(), parent), UncleHash: types.EmptyUncleHash}
+	header := &types.Header{ParentHash: parent.Hash(), Number: big.NewInt(9_000_000), Time: 112, Difficulty: new(big.Int), GasLimit: parent.GasLimit, BaseFee: misc.CalcBaseFee(chain.Config(), parent), UncleHash: types.EmptyUncleHash}
 	if err := engine.VerifyHeader(chain, header, true); err != nil {
 		t.Fatal(err)
 	}

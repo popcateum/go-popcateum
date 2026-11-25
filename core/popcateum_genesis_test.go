@@ -17,7 +17,7 @@ func TestPopcateumConfigMigration(t *testing.T) {
 		db := rawdb.NewMemoryDatabase()
 		genesis := DefaultGenesisBlock().MustCommit(db)
 		legacy := *params.MainnetChainConfig
-		legacy.LondonBlock, legacy.TerminalTotalDifficulty = nil, nil
+		legacy.LondonBlock, legacy.PopstarBlock, legacy.TerminalTotalDifficulty = nil, nil, nil
 		legacy.LegacySeaPopBlock = big.NewInt(9000000)
 		rawdb.WriteChainConfig(db, genesis.Hash(), &legacy)
 		head := &types.Header{Number: big.NewInt(height), Difficulty: big.NewInt(941264)}
@@ -40,7 +40,7 @@ func TestPopcateumConfigMigration(t *testing.T) {
 			t.Fatal("changed genesis or retained SeaPop")
 		}
 		stored := rawdb.ReadChainConfig(db, hash)
-		if stored.LondonBlock.Cmp(big.NewInt(8905000)) != 0 || stored.TerminalTotalDifficulty.Cmp(params.MainnetTerminalTotalDifficulty) != 0 {
+		if stored.PopstarBlock.Cmp(big.NewInt(8905000)) != 0 || stored.LondonBlock.Cmp(big.NewInt(8905000)) != 0 || stored.TerminalTotalDifficulty.Cmp(params.MainnetTerminalTotalDifficulty) != 0 {
 			t.Fatal("upgrade configuration not persisted")
 		}
 		data, _ := json.Marshal(stored)

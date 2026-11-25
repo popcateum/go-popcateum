@@ -50,10 +50,16 @@ var CheckpointOracles = map[common.Hash]*CheckpointOracleConfig{
 
 func newUint64(val uint64) *uint64 { return &val }
 
+const (
+	MainnetPopstarHeight  = 8_905_000
+	MainnetFirstPoSHeight = 9_000_000
+	PopstarPoWDifficulty  = 941_264 // Difficulty of the last pre-Popstar mainnet block.
+	mainnetPrePopstarTD   = 7_288_670_200_714_051
+)
+
 var (
-	// Estimated for a first PoS block near 8,910,000; not a block-height trigger.
-	// See docs/pos-transition.md and scripts/estimate_ttd.py before mining.
-	MainnetTerminalTotalDifficulty, _ = new(big.Int).SetString("7288681830821503", 10)
+	MainnetPrePopstarHash          = common.HexToHash("0x185e96f351cdaf980c707b80b37097803d092bf36f9841ad384ea5b4dba4ab00")
+	MainnetTerminalTotalDifficulty = big.NewInt(mainnetPrePopstarTD + (MainnetFirstPoSHeight-MainnetPopstarHeight)*PopstarPoWDifficulty)
 
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
@@ -72,7 +78,8 @@ var (
 		BerlinBlock:                   big.NewInt(0),
 		PopSongBlock:                  big.NewInt(85_000),
 		PopcornBlock:                  big.NewInt(4_000_000),
-		LondonBlock:                   big.NewInt(8_905_000),
+		LondonBlock:                   big.NewInt(MainnetPopstarHeight),
+		PopstarBlock:                  big.NewInt(MainnetPopstarHeight),
 		TerminalTotalDifficulty:       MainnetTerminalTotalDifficulty,
 		TerminalTotalDifficultyPassed: false,
 		// Shanghai is scheduled only after the beacon chain has merged.
@@ -388,6 +395,7 @@ type CheckpointOracleConfig struct {
 type ChainConfig struct {
 	PopSongBlock *big.Int `json:"popsongBlock,omitempty"`
 	PopcornBlock *big.Int `json:"popcornBlock,omitempty"`
+	PopstarBlock *big.Int `json:"popstarBlock,omitempty"` // deposit predeploys and fixed terminal PoW difficulty
 	// LegacySeaPopBlock is decoded only to reject unsafe migrations after
 	// the old fork. No consensus engine executes SeaPop; new configs omit it.
 	LegacySeaPopBlock *big.Int `json:"seapopBlock,omitempty"`
@@ -506,6 +514,9 @@ func (c *ChainConfig) Description() string {
 	}
 	banner += fmt.Sprintf(" - Berlin:                      #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/berlin.md)\n", c.BerlinBlock)
 	banner += fmt.Sprintf(" - London:                      #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/london.md)\n", c.LondonBlock)
+	if c.PopstarBlock != nil {
+		banner += fmt.Sprintf(" - Popstar:                      #%-8v (deposit contracts, fixed PoW difficulty)\n", c.PopstarBlock)
+	}
 	if c.ArrowGlacierBlock != nil {
 		banner += fmt.Sprintf(" - Arrow Glacier:               #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/arrow-glacier.md)\n", c.ArrowGlacierBlock)
 	}
@@ -601,6 +612,8 @@ func (c *ChainConfig) IsBerlin(num *big.Int) bool {
 }
 
 func (c *ChainConfig) IsPopSong(num *big.Int) bool { return isBlockForked(c.PopSongBlock, num) }
+func (c *ChainConfig) IsPopstar(num *big.Int) bool { return isBlockForked(c.PopstarBlock, num) }
+
 func (c *ChainConfig) IsPopcorn(num *big.Int) bool { return isBlockForked(c.PopcornBlock, num) }
 
 // IsLondon returns whether num is either equal to the London fork block or greater.
@@ -669,6 +682,9 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time u
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
 // to guarantee that forks can be implemented in a different order than on official networks
 func (c *ChainConfig) CheckConfigForkOrder() error {
+	if c.PopstarBlock != nil && c.PopstarBlock.Sign() <= 0 {
+		return fmt.Errorf("Popstar must activate after genesis")
+	}
 	if c.PopSongBlock != nil && c.PopSongBlock.Sign() < 0 || c.PopcornBlock != nil && c.PopcornBlock.Sign() < 0 {
 		return fmt.Errorf("negative Popcateum fork block")
 	}
@@ -695,6 +711,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
 		{name: "berlinBlock", block: c.BerlinBlock},
 		{name: "londonBlock", block: c.LondonBlock},
+		{name: "popstarBlock", block: c.PopstarBlock, optional: true},
 		{name: "arrowGlacierBlock", block: c.ArrowGlacierBlock, optional: true},
 		{name: "grayGlacierBlock", block: c.GrayGlacierBlock, optional: true},
 		{name: "mergeNetsplitBlock", block: c.MergeNetsplitBlock, optional: true},
@@ -742,6 +759,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, headTimestamp uint64) *ConfigCompatError {
 	if isForkBlockIncompatible(c.PopSongBlock, newcfg.PopSongBlock, headNumber) {
 		return newBlockCompatError("PopSong fork block", c.PopSongBlock, newcfg.PopSongBlock)
+	}
+	if isForkBlockIncompatible(c.PopstarBlock, newcfg.PopstarBlock, headNumber) {
+		return newBlockCompatError("Popstar fork block", c.PopstarBlock, newcfg.PopstarBlock)
 	}
 	if isForkBlockIncompatible(c.PopcornBlock, newcfg.PopcornBlock, headNumber) {
 		return newBlockCompatError("Popcorn fork block", c.PopcornBlock, newcfg.PopcornBlock)

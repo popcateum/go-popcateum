@@ -69,7 +69,7 @@ func TestPopcateumLondonBoundary(t *testing.T) {
 	header.BaseFee = big.NewInt(params.InitialBaseFee)
 	header.GasLimit = parent.GasLimit * params.MainnetChainConfig.ElasticityMultiplier()
 	header.GasUsed = 0
-	if header.Difficulty.Cmp(big.NewInt(895823)) != 0 {
+	if header.Difficulty.Cmp(parent.Difficulty) != 0 {
 		t.Fatalf("restart difficulty: %v", header.Difficulty)
 	}
 	engine := NewFaker()
@@ -98,5 +98,23 @@ func TestPopcateumRewardsWithoutSeaPop(t *testing.T) {
 		if db.GetBalance(miner).Cmp(wantMiner) != 0 || db.GetBalance(uncleMiner).Cmp(wantUncle) != 0 {
 			t.Fatalf("wrong rewards at %d", tc.block)
 		}
+	}
+}
+
+func TestPopstarMainnetTerminalDifficulty(t *testing.T) {
+	parent := popHeaders(t)[8_904_999]
+	config := params.MainnetChainConfig
+	td := big.NewInt(7_288_670_200_714_051)
+	for n := int64(8_905_000); n <= 8_999_999; n++ {
+		before := new(big.Int).Set(td)
+		diff := CalcDifficulty(config, parent.Time+12, parent)
+		td.Add(td, diff)
+		if config.IsTerminalPoWBlock(before, td) != (n == 8_999_999) {
+			t.Fatalf("unexpected terminal classification at %d, TD %v", n, td)
+		}
+		parent = &types.Header{Number: big.NewInt(n), Difficulty: diff, Time: parent.Time + 12}
+	}
+	if td.Cmp(config.TerminalTotalDifficulty) != 0 || td.String() != "7288759620794051" {
+		t.Fatalf("terminal TD %s", td)
 	}
 }

@@ -1,4 +1,4 @@
-package deposit
+package deposit_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/popcateum/go-popcateum/common"
+	"github.com/popcateum/go-popcateum/contracts/deposit"
 	"github.com/popcateum/go-popcateum/core/vm/runtime"
 	"github.com/popcateum/go-popcateum/crypto"
 	"github.com/popcateum/go-popcateum/params"
@@ -28,7 +29,7 @@ func TestDepositBerlinAndLondon(t *testing.T) {
 				config.LondonBlock = big.NewInt(0)
 			}
 			cfg := &runtime.Config{ChainConfig: &config, Origin: common.Address{1}, BlockNumber: big.NewInt(8905001), GasLimit: 10000000, Value: new(big.Int)}
-			contractABI, creation, err := Artifact()
+			contractABI, creation, err := deposit.Artifact()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -36,7 +37,7 @@ func TestDepositBerlinAndLondon(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(code, RuntimeCode()) || crypto.Keccak256Hash(code) != common.HexToHash("0x6c029a231254fadb724d63be769f75eedd66362df034a3e663252b49d062a666") {
+			if !bytes.Equal(code, deposit.RuntimeCode()) || crypto.Keccak256Hash(code) != common.HexToHash("0x6c029a231254fadb724d63be769f75eedd66362df034a3e663252b49d062a666") {
 				t.Fatal("runtime mismatch")
 			}
 			cfg.State.SetBalance(cfg.Origin, new(big.Int).Mul(big.NewInt(1000), big.NewInt(params.Ether)))
@@ -57,7 +58,7 @@ func TestDepositBerlinAndLondon(t *testing.T) {
 				}
 				return values[0]
 			}
-			if !bytes.Equal(query("get_deposit_count").([]byte), make([]byte, 8)) || common.Hash(query("get_deposit_root").([32]byte)) != EmptyRoot() {
+			if !bytes.Equal(query("get_deposit_count").([]byte), make([]byte, 8)) || common.Hash(query("get_deposit_root").([32]byte)) != deposit.EmptyRoot() {
 				t.Fatal("wrong initial tree")
 			}
 			var leaves [][32]byte
