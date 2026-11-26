@@ -1,47 +1,288 @@
-# Go Popcateum — PoS 전환 클라이언트
+<p align="center">
+  <img src="assets/logo/popcateum.png" width="350" alt="popcateum" />
+</p>
 
-기존 Popcateum 이력을 유지하는 **Geth v1.11.6 기반 전환 버전**이다. PoW 채굴과 표준 Engine API를 지원하며 미래 TTD에서 Merge한다. SeaPop 합의 규칙은 제거했다.
+## Go Popcateum
 
-**[빌드·기존 데이터 전환·채굴 실행 안내](docs/pos-transition.md)**를 먼저 읽는다. 원본 체인의 사본으로 먼저 검증한다. 비콘이 준비되지 않은 채 TTD에 도달하면 체인이 멈추므로 준비 기간에는 채굴을 중단할 수 있어야 한다.
+Official Golang implementation of the Popcateum protocol.
 
-| 항목 | 설정 |
-|---|---|
-| Chain ID / Network ID | `1213` / `1213` |
-| 기존 이력 | genesis·PopSong(85,000)·Popcorn(4,000,000) 유지 |
-| London · Popstar | `8,905,000` (두 예치 계약 설치 및 PoW 난이도 941,264 적용) |
-| Terminal total difficulty | **`7288759620794051`** |
-| 첫 PoS 높이 | `9,000,000` (마지막 PoW `8,999,999`) |
-| Shanghai | 아직 예약하지 않음; Merge 후 CL Capella와 함께 예약 |
-| 기본 포트 | HTTP `9506`, WS `9507`, Engine `9551`, P2P `60606` |
-| IPC / DB | `gpop.ipc` / `<datadir>/gpop/chaindata` |
+[![API Reference](https://pkg.go.dev/badge/github.com/popcateum/go-popcateum.svg)](https://pkg.go.dev/github.com/popcateum/go-popcateum)
+[![Go Report Card](https://goreportcard.com/badge/github.com/popcateum/go-popcateum)](https://goreportcard.com/report/github.com/popcateum/go-popcateum)
+[![Travis](https://travis-ci.com/popcateum/go-popcateum.svg?branch=main)](https://travis-ci.com/popcateum/go-popcateum)
 
-## 빌드
+This release is based on Geth v1.11.6. On Popcateum mainnet, London and Popstar
+activate at block 8,905,000, installing the validator deposit and batch deposit contracts.
+The first proof-of-stake block is 9,000,000. For existing chain data, mining, and beacon
+node setup, see the [mainnet transition guide](docs/pos-transition.md).
 
-C 컴파일러와 Go가 필요하다. 최신 Go 런처에서는 Makefile이 **Go 1.20.14**를 선택·다운로드한다. 자동 선택을 지원하지 않는 구형 Go 설치에서는 Go 1.20.14를 직접 설치한다. 이 버전의 upstream 의존성은 최신 Go로 바로 링크되지 않을 수 있다.
+## Building the source
 
-```sh
+Building `gpop` requires Go 1.20.14 and a C compiler. The Makefile selects Go 1.20.14
+when the installed Go launcher supports toolchain selection. From the repository root, run
+
+```shell
 make gpop
 ./build/bin/gpop version
 ```
 
-전체 도구는 `make all`로 빌드한다. 이 저장소의 바이너리는 `gpop`이며 Ethereum 배포 사이트의 `geth` 바이너리로 대체하지 않는다.
+To build the full suite of utilities, run
 
-## Popstar 예치 계약
-
-| 역할 | 주소 |
-|---|---|
-| Prysm이 추적하는 표준 예치 계약 | `0x909ca70000000000000000000000000000000001` |
-| 32 POP 일괄 예치 계약 | `0x909CA70000000000000000000000000000000002` |
-
-업그레이드한 마이너가 블록 8,905,000을 채굴하면 일반 거래 실행 전에 두 계약이 설치된다. Prysm의 예치 이벤트 조회 시작 높이도 8,905,000이다.
-
-## 검증 도구
-
-```sh
-GOTOOLCHAIN=go1.20.14 go test ./params ./consensus/... ./core/... ./miner ./eth/... ./cmd/gpop
-python3 scripts/smoke_transition.py
+```shell
+make all
 ```
 
-smoke 스크립트는 공개 테스트 키와 임시 체인·소형 테스트 DAG를 사용하며 실제 비콘 합의를 실행하지 않는다.
+## Executables
 
-upstream: [Geth v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6), commit `ea9e62ca3db5c33aa7438ebf39c189afd53c6bf8`. 라이브러리 LGPL-3.0, `cmd` 실행 프로그램 GPL-3.0 등 기존 라이선스와 저작권 표기를 유지한다.
+The go-popcateum project comes with several wrappers/executables found in the `cmd`
+directory.
+
+| Command | Description |
+| :-----: | ----------- |
+| **`gpop`** | Popcateum's execution client. Runs full or archive nodes, serves JSON-RPC over HTTP, WebSocket and IPC, and connects to a beacon node through the Engine API. |
+| `clef` | Stand-alone signing tool that can serve as a backend signer for `gpop`. |
+| `devp2p` | Utilities for interacting with peers on the networking layer. |
+| `abigen` | Generates type-safe Go bindings from a contract ABI and optional bytecode. |
+| `bootnode` | Runs peer discovery for a private network. |
+| `evm` | Runs and debugs EVM bytecode. |
+| `rlpdump` | Displays encoded RLP data in a human-readable form. |
+| `depositctl` | Plans, sends, or verifies deposit contract deployment transactions. Popstar installs the mainnet contracts automatically. |
+
+## Running `gpop`
+
+Run `gpop --help` for the full list of flags. The examples below assume that
+`build/bin` is on your `PATH`.
+
+### Full node on the main Popcateum network
+
+To start a mainnet node and open its JavaScript console, run
+
+```shell
+$ gpop console
+```
+
+The default sync mode is `snap`. From the console, `eth.blockNumber` shows the
+current execution block. Use `gpop attach` to connect to a running node. After
+the Merge, the node follows the chain through a connected beacon client.
+
+### Local development network
+
+For a temporary chain on your machine, run
+
+```shell
+$ gpop --dev console
+```
+
+### Configuration
+
+As an alternative to passing the numerous flags to the `gpop` binary, you can also pass a
+configuration file via:
+
+```shell
+$ gpop --config /path/to/your_config.toml
+```
+
+To get an idea how the file should look like you can use the `dumpconfig` subcommand to
+export your existing configuration:
+
+```shell
+$ gpop dumpconfig
+```
+
+#### Docker quick start
+
+Build the image from this checkout and start a node with a persistent data volume.
+
+```shell
+docker build -t popcateum/client-go .
+docker run -d --name popcateum-node -v popcateum-data:/data \
+  -p 127.0.0.1:9506:9506 -p 60606:60606/tcp -p 60606:60606/udp \
+  popcateum/client-go --datadir /data --http --http.addr 0.0.0.0
+```
+
+This exposes JSON-RPC on the host's loopback interface and publishes the TCP and UDP
+ports for peer connections.
+
+### Programmatically interfacing `gpop` nodes
+
+As a developer, sooner rather than later you'll want to start interacting with `gpop` and the
+Popcateum network via your own programs and not manually through the console. To aid
+this, `gpop` has built-in support for a JSON-RPC based APIs ([standard APIs](https://pop.wiki/json-rpc/API)
+and [`gpop` specific APIs](https://gpop.popcateum.org/docs/rpc/server)).
+These can be exposed via HTTP, WebSockets and IPC (UNIX sockets on UNIX based
+platforms, and named pipes on Windows).
+
+The IPC interface is enabled by default and exposes all the APIs supported by `gpop`,
+whereas the HTTP and WS interfaces need to manually be enabled and only expose a
+subset of APIs due to security reasons. These can be turned on/off and configured as
+you'd expect.
+
+HTTP based JSON-RPC API options:
+
+  * `--http` Enable the HTTP-RPC server
+  * `--http.addr` HTTP-RPC server listening interface (default: `localhost`)
+  * `--http.port` HTTP-RPC server listening port (default: `9506`)
+  * `--http.api` API's offered over the HTTP-RPC interface (default: `eth,net,web3`)
+  * `--http.corsdomain` Comma separated list of domains from which to accept cross origin requests (browser enforced)
+  * `--ws` Enable the WS-RPC server
+  * `--ws.addr` WS-RPC server listening interface (default: `localhost`)
+  * `--ws.port` WS-RPC server listening port (default: `9507`)
+  * `--ws.api` API's offered over the WS-RPC interface (default: `eth,net,web3`)
+  * `--ws.origins` Origins from which to accept websockets requests
+  * `--ipcdisable` Disable the IPC-RPC server
+  * `--ipcpath` Filename for IPC socket/pipe within the datadir (explicit paths escape it)
+
+You'll need to use your own programming environments' capabilities (libraries, tools, etc) to
+connect via HTTP, WS or IPC to a `gpop` node configured with the above flags and you'll
+need to speak [JSON-RPC](https://www.jsonrpc.org/specification) on all transports. You
+can reuse the same connection for multiple requests!
+
+**Note: Please understand the security implications of opening up an HTTP/WS based
+transport before doing so! Hackers on the internet are actively trying to subvert
+Popcateum nodes with exposed APIs! Further, all browser tabs can access locally
+running web servers, so malicious web pages could try to subvert locally available
+APIs!**
+
+### Operating a private network
+
+Maintaining your own private network is more involved as a lot of configurations taken for
+granted in the official networks need to be manually set up.
+
+#### Defining the private genesis state
+
+First, you'll need to create the genesis state of your networks, which all nodes need to be
+aware of and agree upon. This consists of a small JSON file (e.g. call it `genesis.json`):
+
+```json
+{
+  "config": {
+    "chainId": 42424,
+    "ethash": {},
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "berlinBlock": 0
+  },
+  "alloc": {},
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "difficulty": "0x20000",
+  "extraData": "",
+  "gasLimit": "0x2fefd8",
+  "nonce": "0x0000000000000042",
+  "mixhash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "timestamp": "0x00"
+}
+```
+
+The above fields should be fine for most purposes, although we'd recommend changing
+the `nonce` to some random value so you prevent unknown remote nodes from being able
+to connect to you. If you'd like to pre-fund some accounts for easier testing, create
+the accounts and populate the `alloc` field with their addresses.
+
+```json
+"alloc": {
+  "0x0000000000000000000000000000000000000001": {
+    "balance": "111111111"
+  },
+  "0x0000000000000000000000000000000000000002": {
+    "balance": "222222222"
+  }
+}
+```
+
+With the genesis state defined in the above JSON file, you'll need to initialize **every**
+`gpop` node with it prior to starting it up to ensure all blockchain parameters are correctly
+set:
+
+```shell
+$ gpop --datadir=path/to/custom/data/folder init path/to/genesis.json
+```
+
+#### Creating the rendezvous point
+
+With all nodes that you want to run initialized to the desired genesis state, you'll need to
+start a bootstrap node that others can use to find each other in your network and/or over
+the internet. The clean way is to configure and run a dedicated bootnode:
+
+```shell
+$ bootnode --genkey=boot.key
+$ bootnode --nodekey=boot.key
+```
+
+With the bootnode online, it will display an [`enode` URL](https://pop.wiki/en/fundamentals/enode-url-format)
+that other nodes can use to connect to it and exchange peer information. Make sure to
+replace the displayed IP address information (most probably `[::]`) with your externally
+accessible IP to get the actual `enode` URL.
+
+*Note: You could also use a full-fledged `gpop` node as a bootnode, but it's the less
+recommended way.*
+
+#### Starting up your member nodes
+
+With the bootnode operational and externally reachable (you can try
+`telnet <ip> <port>` to ensure it's indeed reachable), start every subsequent `gpop`
+node pointed to the bootnode for peer discovery via the `--bootnodes` flag. It will
+probably also be desirable to keep the data directory of your private network separated, so
+do also specify a custom `--datadir` flag.
+
+```shell
+$ gpop --datadir=path/to/custom/data/folder --networkid=42424 --bootnodes=<bootnode-enode-url-from-above>
+```
+
+*Note: Since your network will be completely cut off from the main and test networks, you'll
+also need to configure a miner to process transactions and create new blocks for you.*
+
+#### Running a private miner
+
+For a private proof-of-work chain, pass the same data directory and network ID used
+above and set the reward address to your own wallet. One CPU thread is sufficient
+for a small test network.
+
+```shell
+$ gpop --datadir=path/to/custom/data/folder --networkid=42424 \
+  --mine --miner.threads=1 --miner.etherbase="$MINER_ADDRESS"
+```
+
+Use `--miner.gaslimit` to set the target gas limit and `--miner.gasprice` to set
+the minimum gas price for transactions included by your miner.
+
+## Contribution
+
+Thank you for considering to help out with the source code! We welcome contributions
+from anyone on the internet, and are grateful for even the smallest of fixes!
+
+If you'd like to contribute to go-popcateum, please fork, fix, commit and send a pull request
+for the maintainers to review and merge into the main code base. If you wish to submit
+more complex changes though, please check up with the core devs first on [our gitter channel](https://gitter.im/popcateum/go-popcateum)
+to ensure those changes are in line with the general philosophy of the project and/or get
+some early feedback which can make both your efforts much lighter as well as our review
+and merge procedures quick and simple.
+
+Please make sure your contributions adhere to our coding guidelines:
+
+ * Code must adhere to the official Go [formatting](https://golang.org/doc/effective_go.html#formatting)
+   guidelines (i.e. uses [gofmt](https://golang.org/cmd/gofmt/)).
+ * Code must be documented adhering to the official Go [commentary](https://golang.org/doc/effective_go.html#commentary)
+   guidelines.
+ * Pull requests need to be based on and opened against the `main` branch.
+ * Commit messages should be prefixed with the package(s) they modify.
+   * E.g. "pop, rpc: make trace configs optional"
+
+Please see the [Developers' Guide](https://gpop.popcateum.org/docs/developers/devguide)
+for more details on configuring your environment, managing project dependencies, and
+testing procedures.
+
+## License
+
+The go-popcateum library (i.e. all code outside of the `cmd` directory) is licensed under the
+[GNU Lesser General Public License v3.0](https://www.gnu.org/licenses/lgpl-3.0.en.html),
+also included in our repository in the `COPYING.LESSER` file.
+
+The go-popcateum binaries (i.e. all code inside of the `cmd` directory) is licensed under the
+[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html), also
+included in our repository in the `COPYING` file.
