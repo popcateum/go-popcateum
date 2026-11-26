@@ -74,14 +74,17 @@ var GoerliBootnodes = []string{
 
 var V5Bootnodes = []string{}
 
-const dnsPrefix = "enrtree://AKA3AM6LPBYEUDMVNU3BSVQJ5AD45Y7YPOHJLEF6W26QOE4VTUDPE@"
+const (
+	// Discovery trees signed by the operator of https://github.com/popcateum/popdisco.
+	popcateumDNSPrefix = "enrtree://ANQNYEEAN3IHWR22FA2WG65DCTQIP2SPPM5U4ZZV3EJAM2S4G53O4@"
+	popcateumDNS       = popcateumDNSPrefix + "popdisco.popcateum.org"
 
-// Operator-maintained execution peers: https://github.com/popcateum/popdisco
-const popcateumDNS = "enrtree://ANQNYEEAN3IHWR22FA2WG65DCTQIP2SPPM5U4ZZV3EJAM2S4G53O4@popdisco.popcateum.org"
+	// Discovery trees published at ethdisco.net.
+	ethereumDNSPrefix = "enrtree://AKA3AM6LPBYEUDMVNU3BSVQJ5AD45Y7YPOHJLEF6W26QOE4VTUDPE@"
+)
 
 // KnownDNSNetwork returns the address of a public DNS-based node list for the given
-// genesis hash and protocol. See https://github.com/ethereum/discv4-dns-lists for more
-// information.
+// genesis hash and protocol.
 func KnownDNSNetwork(genesis common.Hash, protocol string) string {
 	var net string
 	switch genesis {
@@ -99,5 +102,5 @@ func KnownDNSNetwork(genesis common.Hash, protocol string) string {
 	default:
 		return ""
 	}
-	return dnsPrefix + protocol + "." + net + ".ethdisco.net"
+	return ethereumDNSPrefix + protocol + "." + net + ".ethdisco.net"
 }
