@@ -97,6 +97,10 @@ export your existing configuration:
 $ gpop dumpconfig
 ```
 
+On Popcateum mainnet, full and snap nodes automatically look up signed execution
+peers at `popdisco.popcateum.org`. Operators can submit ENR changes to the
+[Popdisco node list](https://github.com/popcateum/popdisco).
+
 #### Docker quick start
 
 Build the image from this checkout and start a node with a persistent data volume.
