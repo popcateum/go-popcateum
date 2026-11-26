@@ -31,6 +31,15 @@ To build the full suite of utilities, run
 make all
 ```
 
+To build the tools for Windows (x64), Linux (x64 and arm64), and macOS (Apple Silicon and Intel), run
+
+```shell
+./build/cross-build.sh
+```
+
+Each platform has its own directory under `build/bin/`. Pass `./cmd/gpop` to build
+only the node. These builds disable cgo, which excludes direct USB hardware wallet access.
+
 ## Executables
 
 The go-popcateum project comes with several wrappers/executables found in the `cmd`
